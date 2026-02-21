@@ -1,0 +1,14 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+inst/doc
+Meta
+doc
+*.o
+*.so
+*.dll
+claude.md
+development_plan.md
+pcap.md
+

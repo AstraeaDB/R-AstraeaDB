@@ -1,0 +1,8 @@
+bibentry(
+  bibtype  = "Manual",
+  title    = "AstraeaDB: Client for the AstraeaDB Graph Database",
+  author   = person("James", "Harris"),
+  year     = "2025",
+  note     = "R package version 0.1.0",
+  url      = "https://github.com/astraeadb/astraeadb"
+)

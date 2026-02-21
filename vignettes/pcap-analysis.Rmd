@@ -1,0 +1,721 @@
+---
+title: "Network Traffic Analysis from AstraeaDB"
+author: "Generated with R-AstraeaDB"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width  = 10,
+  fig.height = 7
+)
+```
+
+# Overview
+
+This document analyses IP traffic that was captured by `pcap_to_graph.R` and
+stored in AstraeaDB.  The graph model is:
+
+- **Nodes** (label `IPAddress`): one per unique IP, property `ip`.
+- **Edges** (type = protocol): one per **aggregated flow**, defined by the
+  tuple `(src_ip, dst_ip, protocol, service_port)`. Each edge carries:
+    - `service_port` -- the classified server-side port
+    - `service_name` -- human-readable name (e.g. "HTTPS"), if known
+    - `flow_count`   -- number of packets aggregated into this flow
+    - `total_bytes`  -- sum of packet sizes in the flow
+    - `valid_from` / `valid_to` -- temporal window of the flow
+
+```{r libraries}
+library(AstraeaDB)
+library(igraph)
+library(ggplot2)
+library(data.table)
+library(scales)
+library(visNetwork)
+
+# Helper: flatten a list column to an atomic vector (NULL -> NA)
+unbox_col <- function(x) {
+  sapply(x, function(el) if (is.null(el) || length(el) == 0) NA else el[[1]])
+}
+```
+
+# 1 -- Data Extraction
+
+Connect to AstraeaDB, discover every IP node, and collect all flow edges.
+
+```{r connect}
+client <- astraea_connect()
+client$ping()
+```
+
+```{r extract-nodes}
+# Use GQL to find all IPAddress nodes regardless of their internal IDs.
+node_result <- client$query("MATCH (n:IPAddress) RETURN n")
+nodes_list <- lapply(node_result$rows, function(row) {
+  n <- row[[1]]
+  list(node_id = n$id, ip = n$properties$ip %||% NA_character_)
+})
+
+nodes_dt <- rbindlist(nodes_list, fill = TRUE)
+
+# Flatten list columns to atomic types
+for (col in names(nodes_dt)) {
+  if (is.list(nodes_dt[[col]])) {
+    set(nodes_dt, j = col, value = unbox_col(nodes_dt[[col]]))
+  }
+}
+nodes_dt[, node_id := as.character(node_id)]
+nodes_dt[, ip := as.character(ip)]
+
+cat(sprintf("Discovered %d IP address nodes.\n", nrow(nodes_dt)))
+```
+
+```{r extract-edges}
+# Use GQL to pull all flow edges between IPAddress nodes.
+edge_result <- client$query(
+  "MATCH (s:IPAddress)-[e]->(d:IPAddress)
+   RETURN id(e), s.ip, d.ip, type(e), e.service_port, e.service_name,
+          e.flow_count, e.total_bytes"
+)
+
+edges_list <- lapply(edge_result$rows, function(row) {
+  list(
+    edge_id      = row[[1]],
+    src_ip       = row[[2]],
+    dst_ip       = row[[3]],
+    protocol     = row[[4]] %||% "IP",
+    service_port = row[[5]] %||% NA_integer_,
+    service_name = row[[6]] %||% NA_character_,
+    flow_count   = row[[7]] %||% 1L,
+    total_bytes  = row[[8]] %||% NA_integer_
+  )
+})
+
+edges_dt <- rbindlist(edges_list, fill = TRUE)
+
+# Flatten list columns to atomic types (query results may wrap values in lists)
+for (col in names(edges_dt)) {
+  if (is.list(edges_dt[[col]])) {
+    set(edges_dt, j = col, value = unbox_col(edges_dt[[col]]))
+  }
+}
+# Coerce to expected types
+edges_dt[, edge_id      := as.character(edge_id)]
+edges_dt[, src_ip       := as.character(src_ip)]
+edges_dt[, dst_ip       := as.character(dst_ip)]
+edges_dt[, protocol     := as.character(protocol)]
+edges_dt[, service_port := as.integer(service_port)]
+edges_dt[, service_name := as.character(service_name)]
+edges_dt[, flow_count   := as.integer(flow_count)]
+edges_dt[, total_bytes  := as.numeric(total_bytes)]
+
+cat(sprintf("Collected %d flow edges (representing %s packets).\n",
+            nrow(edges_dt),
+            format(sum(edges_dt$flow_count, na.rm = TRUE), big.mark = ",")))
+```
+
+```{r extract-timestamps}
+# Timestamps live in the edge's valid_from / valid_to fields.
+edges_dt[, c("valid_from_ms", "valid_to_ms") := {
+  vf <- vapply(edge_id, function(eid) {
+    e <- tryCatch(client$get_edge(eid), error = function(e) NULL)
+    if (!is.null(e) && !is.null(e$valid_from)) e$valid_from else NA_real_
+  }, numeric(1))
+  vt <- vapply(edge_id, function(eid) {
+    e <- tryCatch(client$get_edge(eid), error = function(e) NULL)
+    if (!is.null(e) && !is.null(e$valid_to)) e$valid_to else NA_real_
+  }, numeric(1))
+  list(vf, vt)
+}]
+```
+
+```{r enrich}
+# Build lookup and add derived columns.
+ip_lookup <- setNames(nodes_dt$ip, as.character(nodes_dt$node_id))
+
+edges_dt[, service_port_int := suppressWarnings(as.integer(service_port))]
+edges_dt[, timestamp := as.POSIXct(valid_from_ms / 1000,
+                                    origin = "1970-01-01")]
+edges_dt[, timestamp_end := as.POSIXct(valid_to_ms / 1000,
+                                        origin = "1970-01-01")]
+edges_dt[, flow_duration_s := (valid_to_ms - valid_from_ms) / 1000]
+
+# Use package function for service name lookup on missing names
+edges_dt[is.na(service_name) & !is.na(service_port_int),
+         service_name := port_service_name(service_port_int)]
+```
+
+```{r summary-table}
+total_packets <- sum(edges_dt$flow_count, na.rm = TRUE)
+summary_stats <- data.frame(
+  Metric = c("Unique IP addresses",
+             "Total flows (edges)",
+             "Total packets (aggregated)",
+             "Protocols observed",
+             "Time span (seconds)",
+             "Total bytes captured",
+             "Avg packets per flow"),
+  Value = c(
+    nrow(nodes_dt),
+    nrow(edges_dt),
+    total_packets,
+    length(unique(edges_dt$protocol)),
+    if (nrow(edges_dt) > 0)
+      round(as.numeric(difftime(max(edges_dt$timestamp, na.rm = TRUE),
+                                min(edges_dt$timestamp, na.rm = TRUE),
+                                units = "secs")), 1)
+    else 0,
+    sum(edges_dt$total_bytes, na.rm = TRUE),
+    if (nrow(edges_dt) > 0) round(total_packets / nrow(edges_dt), 1) else 0
+  )
+)
+knitr::kable(summary_stats, caption = "Capture summary")
+```
+
+# 2 -- Protocol Distribution
+
+```{r protocol-bar}
+proto_counts <- edges_dt[, .(
+  flows   = .N,
+  packets = sum(flow_count, na.rm = TRUE)
+), by = protocol][order(-packets)]
+
+ggplot(proto_counts, aes(x = reorder(protocol, packets),
+                         y = packets, fill = protocol)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Packets by Protocol (aggregated from flows)",
+       x = "Protocol", y = "Packet count") +
+  theme_minimal(base_size = 14)
+```
+
+```{r protocol-bytes}
+proto_bytes <- edges_dt[, .(
+  total_bytes  = sum(total_bytes, na.rm = TRUE),
+  total_pkts   = sum(flow_count, na.rm = TRUE),
+  avg_pkt_size = round(sum(total_bytes, na.rm = TRUE) /
+                         sum(flow_count, na.rm = TRUE)),
+  flow_count   = .N
+), by = protocol][order(-total_bytes)]
+
+knitr::kable(proto_bytes, caption = "Traffic volume by protocol",
+             format.args = list(big.mark = ","))
+```
+
+# 3 -- Top Talkers
+
+## By total packets sent
+
+```{r top-senders}
+top_senders <- edges_dt[, .(packets_sent = sum(flow_count, na.rm = TRUE)),
+                        by = src_ip][order(-packets_sent)][1:min(.N, 20)]
+
+ggplot(top_senders, aes(x = reorder(src_ip, packets_sent), y = packets_sent)) +
+  geom_col(fill = "#3498db") +
+  coord_flip() +
+  labs(title = "Top 20 Source IPs by Packet Count",
+       x = NULL, y = "Packets sent") +
+  theme_minimal(base_size = 13)
+```
+
+## By total bytes sent
+
+```{r top-senders-bytes}
+top_bytes <- edges_dt[, .(total_bytes = sum(total_bytes, na.rm = TRUE)),
+                      by = src_ip][order(-total_bytes)][1:min(.N, 20)]
+
+ggplot(top_bytes, aes(x = reorder(src_ip, total_bytes), y = total_bytes)) +
+  geom_col(fill = "#2ecc71") +
+  coord_flip() +
+  labs(title = "Top 20 Source IPs by Bytes Sent",
+       x = NULL, y = "Bytes") +
+  scale_y_continuous(labels = label_bytes()) +
+  theme_minimal(base_size = 13)
+```
+
+## Busiest conversations (IP pairs)
+
+```{r top-pairs}
+pair_traffic <- edges_dt[, .(
+  flows   = .N,
+  packets = sum(flow_count, na.rm = TRUE),
+  bytes   = sum(total_bytes, na.rm = TRUE)
+), by = .(src_ip, dst_ip)][order(-packets)]
+
+knitr::kable(head(pair_traffic, 20),
+             caption = "Top 20 IP-pair conversations by packet count",
+             format.args = list(big.mark = ","))
+```
+
+# 4 -- Port Analysis
+
+## Service Port Distribution
+
+```{r service-port-dist}
+svc_counts <- edges_dt[!is.na(service_port_int), .(
+  flows   = .N,
+  packets = sum(flow_count, na.rm = TRUE),
+  bytes   = sum(total_bytes, na.rm = TRUE)
+), by = .(service_port_int, service_name)][order(-packets)]
+
+svc_counts[, label := fifelse(
+  !is.na(service_name) & service_name != "",
+  paste0(service_port_int, " (", service_name, ")"),
+  as.character(service_port_int)
+)]
+
+top_svcs <- svc_counts[1:min(.N, 20)]
+
+ggplot(top_svcs, aes(x = reorder(label, packets), y = packets)) +
+  geom_col(fill = "#9b59b6") +
+  coord_flip() +
+  labs(title = "Top 20 Service Ports by Packet Count",
+       x = NULL, y = "Packet count (aggregated)") +
+  theme_minimal(base_size = 13)
+```
+
+```{r service-port-bytes}
+ggplot(top_svcs, aes(x = reorder(label, bytes), y = bytes)) +
+  geom_col(fill = "#e67e22") +
+  coord_flip() +
+  labs(title = "Top 20 Service Ports by Total Bytes",
+       x = NULL, y = "Total bytes") +
+  scale_y_continuous(labels = label_bytes()) +
+  theme_minimal(base_size = 13)
+```
+
+## Port-protocol cross-tabulation
+
+```{r port-proto-heatmap, fig.height=8}
+pp <- edges_dt[!is.na(service_port_int), .(
+  packets = sum(flow_count, na.rm = TRUE)
+), by = .(protocol, service_port_int)][order(-packets)]
+pp_top <- pp[service_port_int %in% svc_counts$service_port_int[1:15]]
+
+if (nrow(pp_top) > 0) {
+  ggplot(pp_top, aes(x = protocol,
+                     y = factor(service_port_int),
+                     fill = log10(packets + 1))) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(name = "log10(packets)") +
+    labs(title = "Protocol vs Service Port",
+         x = "Protocol", y = "Service port") +
+    theme_minimal(base_size = 13)
+}
+```
+
+# 5 -- Temporal Patterns
+
+```{r time-series, fig.height=5}
+if (sum(!is.na(edges_dt$timestamp)) > 0) {
+  ts_dt <- edges_dt[!is.na(timestamp)]
+  # Bin flow arrivals into 1-second intervals, weighting by flow_count
+  ts_dt[, second := as.POSIXct(floor(as.numeric(timestamp)),
+                                origin = "1970-01-01")]
+  ts_agg <- ts_dt[, .(packets = sum(flow_count, na.rm = TRUE),
+                       bytes = sum(total_bytes, na.rm = TRUE),
+                       flows = .N),
+                  by = second][order(second)]
+
+  ggplot(ts_agg, aes(x = second, y = packets)) +
+    geom_line(color = "#2c3e50", linewidth = 0.5) +
+    geom_smooth(method = "loess", se = TRUE, color = "#e74c3c", span = 0.3) +
+    labs(title = "Packet Rate Over Time (from flow aggregates)",
+         x = "Time", y = "Packets per second") +
+    theme_minimal(base_size = 13)
+}
+```
+
+```{r flow-arrival-rate, fig.height=5}
+if (exists("ts_agg") && nrow(ts_agg) > 0) {
+  ggplot(ts_agg, aes(x = second, y = flows)) +
+    geom_line(color = "#1abc9c", linewidth = 0.5) +
+    geom_smooth(method = "loess", se = TRUE, color = "#8e44ad", span = 0.3) +
+    labs(title = "Flow Arrival Rate Over Time",
+         x = "Time", y = "New flows per second") +
+    theme_minimal(base_size = 13)
+}
+```
+
+```{r time-by-proto, fig.height=6}
+if (sum(!is.na(edges_dt$timestamp)) > 0) {
+  ts_proto <- ts_dt[, .(packets = sum(flow_count, na.rm = TRUE)),
+                    by = .(second, protocol)][order(second)]
+
+  ggplot(ts_proto, aes(x = second, y = packets, fill = protocol)) +
+    geom_area(alpha = 0.7, position = "stack") +
+    labs(title = "Traffic Volume by Protocol Over Time",
+         x = "Time", y = "Packets per second", fill = "Protocol") +
+    theme_minimal(base_size = 13)
+}
+```
+
+```{r flow-duration, fig.height=5}
+if (sum(!is.na(edges_dt$flow_duration_s)) > 0) {
+  ggplot(edges_dt[!is.na(flow_duration_s) & flow_duration_s > 0],
+         aes(x = flow_duration_s)) +
+    geom_histogram(fill = "#2c3e50", color = "white", bins = 50) +
+    scale_x_log10() +
+    labs(title = "Flow Duration Distribution",
+         x = "Duration (seconds, log scale)", y = "Number of flows") +
+    theme_minimal(base_size = 13)
+}
+```
+
+# 6 -- Network Graph Analysis
+
+Build an `igraph` network where edge weights are packet counts between IP pairs.
+
+```{r build-igraph}
+# Aggregate to one edge per (src, dst, protocol) tuple, summing flow counts
+agg <- edges_dt[, .(
+  weight      = sum(flow_count, na.rm = TRUE),
+  total_bytes = sum(total_bytes, na.rm = TRUE),
+  num_flows   = .N
+), by = .(src_ip, dst_ip, protocol)]
+
+# Use only IPs that appear in edges (some nodes may be isolates)
+all_ips <- unique(c(edges_dt$src_ip, edges_dt$dst_ip, nodes_dt$ip))
+g <- graph_from_data_frame(
+  d        = agg[, .(from = src_ip, to = dst_ip,
+                      weight = weight, protocol = protocol,
+                      total_bytes = total_bytes,
+                      num_flows = num_flows)],
+  directed = TRUE,
+  vertices = data.frame(name = all_ips, stringsAsFactors = FALSE)
+)
+
+cat(sprintf("Graph: %d vertices, %d aggregated edges\n",
+            vcount(g), ecount(g)))
+```
+
+## Degree distribution
+
+```{r degree-dist}
+deg_in  <- degree(g, mode = "in")
+deg_out <- degree(g, mode = "out")
+deg_all <- degree(g, mode = "all")
+
+deg_df <- data.frame(
+  ip     = names(deg_all),
+  degree_in  = deg_in,
+  degree_out = deg_out,
+  degree_total = deg_all,
+  stringsAsFactors = FALSE
+)
+
+ggplot(data.frame(degree = deg_all), aes(x = degree)) +
+  geom_histogram(fill = "#1abc9c", color = "white", bins = 30) +
+  labs(title = "Degree Distribution (all directions)",
+       x = "Degree", y = "Number of IPs") +
+  theme_minimal(base_size = 13)
+```
+
+```{r degree-log, fig.height=5}
+# Check for power-law / heavy tail
+deg_tab <- as.data.frame(table(degree = deg_all))
+deg_tab$degree <- as.integer(as.character(deg_tab$degree))
+deg_tab <- deg_tab[deg_tab$degree > 0, ]
+
+if (nrow(deg_tab) > 3) {
+  ggplot(deg_tab, aes(x = degree, y = Freq)) +
+    geom_point(color = "#e67e22", size = 2) +
+    scale_x_log10() + scale_y_log10() +
+    labs(title = "Degree Distribution (log-log scale)",
+         subtitle = "A straight line suggests scale-free / power-law structure",
+         x = "Degree (log)", y = "Count (log)") +
+    theme_minimal(base_size = 13)
+}
+```
+
+## Centrality measures
+
+```{r centrality}
+# Compute centralities on the simplified (no multi-edge) graph
+gs <- simplify(g, edge.attr.comb = list(weight = "sum",
+                                         total_bytes = "sum",
+                                         num_flows = "sum",
+                                         protocol = "first"))
+
+centrality_dt <- data.table(
+  ip        = V(gs)$name,
+  degree    = degree(gs, mode = "all"),
+  in_degree = degree(gs, mode = "in"),
+  out_degree = degree(gs, mode = "out"),
+  strength  = strength(gs, mode = "all"),
+  betweenness = round(betweenness(gs, directed = TRUE, normalized = TRUE), 6),
+  pagerank  = round(page_rank(gs, directed = TRUE)$vector, 6)
+)
+setorder(centrality_dt, -pagerank)
+
+knitr::kable(head(centrality_dt, 20),
+             caption = "Top 20 IPs by PageRank")
+```
+
+## Community detection
+
+```{r communities, fig.height=8}
+g_undir <- as.undirected(gs, mode = "collapse",
+                         edge.attr.comb = list(weight = "sum",
+                                               total_bytes = "sum",
+                                               num_flows = "sum",
+                                               protocol = "first"))
+if (vcount(g_undir) >= 3) {
+  comm <- cluster_louvain(g_undir, weights = E(g_undir)$weight)
+  cat(sprintf("Louvain detected %d communities (modularity = %.3f)\n",
+              length(comm), modularity(comm)))
+
+  comm_dt <- data.table(
+    ip = V(g_undir)$name,
+    community = membership(comm)
+  )
+  comm_sizes <- comm_dt[, .N, by = community][order(-N)]
+  setnames(comm_sizes, "N", "members")
+
+  knitr::kable(comm_sizes, caption = "Community sizes")
+
+  # Store membership for visualisation
+  V(g_undir)$community <- membership(comm)
+}
+```
+
+# 7 -- Anomaly Indicators
+
+Flag IPs that exhibit unusual behaviour: high fan-out to many destinations
+(potential scanning), connections to many distinct service ports (potential
+reconnaissance), or asymmetric traffic ratios.
+
+```{r anomalies}
+anomaly_dt <- edges_dt[, .(
+  unique_dst_ips   = uniqueN(dst_ip),
+  unique_svc_ports = uniqueN(service_port_int, na.rm = TRUE),
+  packets_sent     = sum(flow_count, na.rm = TRUE),
+  bytes_sent       = sum(total_bytes, na.rm = TRUE),
+  flows_out        = .N
+), by = src_ip]
+
+# Incoming stats
+incoming <- edges_dt[, .(
+  packets_received = sum(flow_count, na.rm = TRUE),
+  bytes_received   = sum(total_bytes, na.rm = TRUE),
+  flows_in         = .N
+), by = .(dst_ip)]
+
+anomaly_dt <- merge(anomaly_dt, incoming,
+                    by.x = "src_ip", by.y = "dst_ip", all.x = TRUE)
+anomaly_dt[is.na(packets_received), packets_received := 0L]
+anomaly_dt[is.na(bytes_received), bytes_received := 0L]
+anomaly_dt[is.na(flows_in), flows_in := 0L]
+
+# Asymmetry ratio: > 1 means more sending than receiving
+anomaly_dt[, send_recv_ratio := fifelse(
+  packets_received > 0,
+  round(packets_sent / packets_received, 2),
+  Inf
+)]
+```
+
+## Potential scanners (high destination fan-out)
+
+```{r scanners}
+scanner_thresh <- quantile(anomaly_dt$unique_dst_ips, 0.9, na.rm = TRUE)
+scanners <- anomaly_dt[unique_dst_ips >= max(scanner_thresh, 3)][order(-unique_dst_ips)]
+
+if (nrow(scanners) > 0) {
+  ggplot(scanners, aes(x = reorder(src_ip, unique_dst_ips),
+                       y = unique_dst_ips)) +
+    geom_col(fill = "#e74c3c") +
+    coord_flip() +
+    labs(title = "IPs with High Destination Fan-Out",
+         subtitle = "Potential network scanning behaviour",
+         x = NULL, y = "Unique destination IPs") +
+    theme_minimal(base_size = 13)
+}
+
+knitr::kable(head(scanners, 15),
+             caption = "IPs contacting the most unique destinations",
+             format.args = list(big.mark = ","))
+```
+
+## Port reconnaissance (many distinct service ports)
+
+```{r port-recon}
+recon_thresh <- quantile(anomaly_dt$unique_svc_ports, 0.9, na.rm = TRUE)
+recon <- anomaly_dt[unique_svc_ports >= max(recon_thresh, 5)][order(-unique_svc_ports)]
+
+if (nrow(recon) > 0) {
+  ggplot(recon, aes(x = reorder(src_ip, unique_svc_ports),
+                    y = unique_svc_ports)) +
+    geom_col(fill = "#f39c12") +
+    coord_flip() +
+    labs(title = "IPs Targeting Many Distinct Service Ports",
+         subtitle = "Potential port reconnaissance",
+         x = NULL, y = "Unique service ports") +
+    theme_minimal(base_size = 13)
+}
+```
+
+## Send/receive asymmetry
+
+```{r asymmetry}
+asym <- anomaly_dt[is.finite(send_recv_ratio)][order(-send_recv_ratio)]
+
+if (nrow(asym) > 0) {
+  ggplot(asym, aes(x = packets_sent, y = packets_received,
+                   color = send_recv_ratio)) +
+    geom_point(size = 3, alpha = 0.8) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed",
+                color = "grey50") +
+    scale_color_viridis_c(name = "Send/Recv\nratio", trans = "log1p") +
+    labs(title = "Traffic Symmetry per IP",
+         subtitle = "Points above the dashed line receive more than they send",
+         x = "Packets sent", y = "Packets received") +
+    theme_minimal(base_size = 13)
+}
+```
+
+# 8 -- Interactive Network Map
+
+```{r visnetwork, fig.height=8}
+# Prepare visNetwork data from the simplified igraph
+vis_nodes <- data.frame(
+  id    = V(gs)$name,
+  label = V(gs)$name,
+  stringsAsFactors = FALSE
+)
+
+# Size nodes by total strength (packets in + out)
+node_strength <- strength(gs, mode = "all")
+vis_nodes$value <- as.numeric(node_strength[vis_nodes$id])
+
+# Colour by community if available
+if (!is.null(V(g_undir)$community)) {
+  comm_map <- setNames(V(g_undir)$community, V(g_undir)$name)
+  vis_nodes$group <- as.character(comm_map[vis_nodes$id])
+}
+
+vis_edges <- data.frame(
+  from   = ends(gs, E(gs))[, 1],
+  to     = ends(gs, E(gs))[, 2],
+  value  = E(gs)$weight,
+  title  = paste0(E(gs)$protocol, " — ",
+                  format(E(gs)$weight, big.mark = ","), " packets, ",
+                  format(E(gs)$total_bytes, big.mark = ","), " bytes"),
+  arrows = "to",
+  stringsAsFactors = FALSE
+)
+
+visNetwork(vis_nodes, vis_edges,
+           main = "Captured IP Traffic Graph",
+           submain = paste(nrow(vis_nodes), "hosts,",
+                           nrow(vis_edges), "aggregated connections")) %>%
+  visOptions(highlightNearest = list(enabled = TRUE, degree = 1),
+             nodesIdSelection = TRUE) %>%
+  visPhysics(solver = "forceAtlas2Based",
+             forceAtlas2Based = list(gravitationalConstant = -50)) %>%
+  visInteraction(navigationButtons = TRUE)
+```
+
+# 9 -- Payload Analysis
+
+Examine the distribution of traffic volumes across flows to identify traffic
+profiles (e.g., small DNS lookups vs large data transfers).
+
+```{r avg-pkt-size}
+edges_dt[, avg_pkt_size := fifelse(
+  flow_count > 0,
+  total_bytes / flow_count,
+  NA_real_
+)]
+```
+
+```{r payload-dist}
+ggplot(edges_dt[!is.na(total_bytes)],
+       aes(x = total_bytes)) +
+  geom_histogram(fill = "#2c3e50", color = "white", bins = 50) +
+  scale_x_log10(labels = label_bytes()) +
+  labs(title = "Flow Size Distribution",
+       x = "Total bytes per flow (log scale)", y = "Number of flows") +
+  theme_minimal(base_size = 13)
+```
+
+```{r avg-pkt-by-proto, fig.height=6}
+if (edges_dt[, uniqueN(protocol)] > 1) {
+  ggplot(edges_dt[!is.na(avg_pkt_size)],
+         aes(x = protocol, y = avg_pkt_size, fill = protocol)) +
+    geom_violin(show.legend = FALSE, alpha = 0.7) +
+    geom_boxplot(width = 0.15, outlier.size = 0.5, show.legend = FALSE) +
+    labs(title = "Average Packet Size by Protocol",
+         subtitle = "total_bytes / flow_count for each flow",
+         x = "Protocol", y = "Average packet size (bytes)") +
+    theme_minimal(base_size = 13)
+}
+```
+
+```{r flow-count-dist}
+ggplot(edges_dt[flow_count > 0],
+       aes(x = flow_count)) +
+  geom_histogram(fill = "#3498db", color = "white", bins = 50) +
+  scale_x_log10() +
+  labs(title = "Packets per Flow Distribution",
+       x = "Packets per flow (log scale)", y = "Number of flows") +
+  theme_minimal(base_size = 13)
+```
+
+# 10 -- AstraeaDB Graph Traversal Examples
+
+Demonstrate using AstraeaDB's built-in graph algorithms on the captured data.
+
+```{r bfs-example}
+# BFS from the highest-PageRank node
+top_ip     <- centrality_dt$ip[1]
+top_ip_id  <- nodes_dt[ip == top_ip, node_id]
+if (length(top_ip_id) == 1) {
+  bfs_result <- client$bfs(top_ip_id, max_depth = 2L)
+  cat(sprintf(
+    "BFS from %s (node %d): reached %d nodes within 2 hops.\n",
+    top_ip, top_ip_id, length(bfs_result)
+  ))
+}
+```
+
+```{r shortest-path-example}
+# Shortest path between the two highest-PageRank nodes
+if (nrow(centrality_dt) >= 2) {
+  id_a <- nodes_dt[ip == centrality_dt$ip[1], node_id]
+  id_b <- nodes_dt[ip == centrality_dt$ip[2], node_id]
+  if (length(id_a) == 1 && length(id_b) == 1) {
+    sp <- tryCatch(
+      client$shortest_path(id_a, id_b, weighted = FALSE),
+      error = function(e) NULL
+    )
+    if (!is.null(sp) && length(sp$path) > 0) {
+      path_ips <- sapply(sp$path, function(nid) ip_lookup[as.character(nid)])
+      cat(sprintf("Shortest path (%d hops): %s\n",
+                  length(sp$path) - 1L,
+                  paste(path_ips, collapse = " -> ")))
+    } else {
+      cat("No path found between the top two IPs.\n")
+    }
+  }
+}
+```
+
+---
+
+```{r disconnect, include=FALSE}
+client$disconnect()
+```
+
+*Analysis generated on `r Sys.time()` from AstraeaDB captured traffic.*

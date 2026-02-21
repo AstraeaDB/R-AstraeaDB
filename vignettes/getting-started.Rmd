@@ -1,0 +1,488 @@
+---
+title: "Getting Started with AstraeaDB"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with AstraeaDB}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+This vignette walks through every major operation supported by the AstraeaDB
+R package. Each section contains a self-contained code example that you can
+copy into an R session once you have a running AstraeaDB server.
+
+## Starting the Server
+
+Before you can connect from R you need a running AstraeaDB instance. The
+easiest way to start one locally is from the AstraeaDB source tree:
+
+```{bash start-server}
+cargo run -p astraea-cli -- serve
+```
+
+The default ports are 7687 (JSON/TCP), 7688 (gRPC), and 7689 (Arrow Flight).
+
+## Connecting from R
+
+There are two ways to create a client and connect to the server.
+
+### Option A: Convenience Function
+
+The simplest approach is the `astraea_connect()` helper, which creates a
+client and calls `connect()` in one step:
+
+```{r connect-convenience}
+library(AstraeaDB)
+
+client <- astraea_connect()
+# Equivalent to: astraea_connect(host = "127.0.0.1", port = 7687L)
+```
+
+### Option B: Explicit Construction
+
+If you need more control (for example, to set an authentication token), you
+can construct and connect the client separately:
+
+```{r connect-explicit}
+library(AstraeaDB)
+
+client <- AstraeaClient$new(
+  host       = "127.0.0.1",
+  port       = 7687L,
+  auth_token = "my-secret-token"
+)
+client$connect()
+```
+
+In either case, you can verify the connection with a health-check ping:
+
+```{r ping}
+info <- client$ping()
+info
+```
+
+## Creating Nodes
+
+A node requires at least one **label** (character vector) and a set of
+**properties** (named list). You may optionally provide an **embedding**
+(numeric vector) for vector similarity search.
+
+```{r create-nodes}
+# Basic node
+alice_id <- client$create_node(
+  labels     = c("Person"),
+  properties = list(name = "Alice", age = 30, city = "San Francisco")
+)
+
+# Node with multiple labels
+bob_id <- client$create_node(
+  labels     = c("Person", "Engineer"),
+  properties = list(name = "Bob", age = 25, city = "New York")
+)
+
+# Node with an embedding vector
+carol_id <- client$create_node(
+  labels     = c("Person"),
+  properties = list(name = "Carol", age = 35),
+  embedding  = c(0.12, 0.87, 0.45, 0.33)
+)
+```
+
+`create_node()` returns the integer ID assigned to the new node by the
+server.
+
+## Reading Nodes
+
+Retrieve a node by its ID. The result is a list with `labels` and
+`properties`:
+
+```{r get-node}
+node <- client$get_node(alice_id)
+
+node$labels
+#> [1] "Person"
+
+node$properties$name
+#> [1] "Alice"
+
+node$properties$age
+#> [1] 30
+```
+
+## Updating Nodes
+
+`update_node()` uses **merge semantics**: existing properties that are not
+mentioned in the update are preserved. New properties are added and existing
+ones are overwritten.
+
+```{r update-node}
+# Add a new property; existing name, age, city are kept
+client$update_node(alice_id, list(department = "Research"))
+
+# Verify
+updated <- client$get_node(alice_id)
+updated$properties$department
+#> [1] "Research"
+
+updated$properties$city
+#> [1] "San Francisco"
+```
+
+## Deleting Nodes
+
+Deleting a node also removes all edges connected to it:
+
+```{r delete-node}
+temp_id <- client$create_node(
+  labels     = c("Temp"),
+  properties = list(note = "will be deleted")
+)
+client$delete_node(temp_id)
+```
+
+## Creating Edges
+
+An edge connects a source node to a target node with a typed relationship.
+Optional parameters include properties, weight, and temporal validity
+bounds.
+
+```{r create-edges}
+# Simple edge
+edge1 <- client$create_edge(
+  source    = alice_id,
+  target    = bob_id,
+  edge_type = "KNOWS",
+  properties = list(context = "work")
+)
+
+# Weighted edge
+edge2 <- client$create_edge(
+  source    = bob_id,
+  target    = carol_id,
+  edge_type = "FOLLOWS",
+  weight    = 0.7
+)
+
+# Temporal edge with validity window (milliseconds since epoch)
+# Valid from 2023-01-01 to 2024-01-01
+edge3 <- client$create_edge(
+  source     = alice_id,
+  target     = carol_id,
+  edge_type  = "MENTORS",
+  properties = list(topic = "graph databases"),
+  weight     = 1.0,
+  valid_from = 1672531200000,
+  valid_to   = 1704067200000
+)
+```
+
+`create_edge()` returns the integer ID of the new edge. The `valid_from` and
+`valid_to` parameters are numeric scalars representing milliseconds since the
+Unix epoch. When set, the edge is only visible in temporal queries whose
+timestamp falls within the window.
+
+## Reading and Updating Edges
+
+```{r edge-read-update}
+# Read
+edge <- client$get_edge(edge1)
+edge$edge_type
+#> [1] "KNOWS"
+edge$properties$context
+#> [1] "work"
+
+# Update (merge semantics, same as nodes)
+client$update_edge(edge1, list(strength = "strong"))
+```
+
+## Deleting Edges
+
+```{r delete-edge}
+client$delete_edge(edge2)
+```
+
+## Graph Traversals
+
+### Neighbors
+
+Retrieve direct neighbors of a node. You can filter by direction
+(`"outgoing"`, `"incoming"`, or `"both"`) and by edge type:
+
+```{r neighbors}
+# Outgoing neighbors (default)
+out <- client$neighbors(alice_id, direction = "outgoing")
+
+# Incoming neighbors
+inc <- client$neighbors(bob_id, direction = "incoming")
+
+# Both directions, filtered by edge type
+knows <- client$neighbors(alice_id, direction = "both", edge_type = "KNOWS")
+```
+
+Each entry in the result contains at least `node_id` and `edge_id`.
+
+### Breadth-First Search (BFS)
+
+BFS explores the graph outward from a starting node up to a maximum depth:
+
+```{r bfs}
+bfs_result <- client$bfs(alice_id, max_depth = 2L)
+
+# Each entry has node_id and depth
+for (entry in bfs_result) {
+  cat(sprintf("Node %d at depth %d\n", entry$node_id, entry$depth))
+}
+```
+
+### Shortest Path
+
+Find the shortest path between two nodes. Set `weighted = TRUE` to use edge
+weights (Dijkstra's algorithm) instead of hop count:
+
+```{r shortest-path}
+# Unweighted (hop count)
+sp <- client$shortest_path(alice_id, carol_id)
+sp$path    # integer vector of node IDs
+sp$length  # number of hops
+
+# Weighted (minimizes total edge weight)
+sp_w <- client$shortest_path(alice_id, carol_id, weighted = TRUE)
+sp_w$path
+sp_w$cost  # total weight
+```
+
+## GQL Queries
+
+AstraeaDB supports a subset of Graph Query Language (GQL). You can run
+queries with `MATCH`, `WHERE`, `RETURN`, `ORDER BY`, and `LIMIT` clauses:
+
+```{r gql}
+# Find all Person nodes
+result <- client$query("MATCH (p:Person) RETURN p.name, p.age")
+
+# Filter with WHERE
+result <- client$query(
+  "MATCH (p:Person) WHERE p.age > 25 RETURN p.name, p.city"
+)
+
+# Edges in the pattern
+result <- client$query(
+  "MATCH (a:Person)-[:KNOWS]->(b:Person) RETURN a.name, b.name"
+)
+
+# Ordering and limiting
+result <- client$query(
+  "MATCH (p:Person) RETURN p.name, p.age ORDER BY p.age LIMIT 10"
+)
+```
+
+The `query()` method returns the raw server response data. For tabular
+results you may want to use the `UnifiedClient$query_df()` method (see the
+Advanced Features vignette for Arrow Flight support).
+
+## Batch Operations
+
+When you need to create or delete many nodes or edges at once, batch methods
+are more convenient than calling single-item methods in a loop.
+
+### Batch Create
+
+```{r batch-create}
+# Create multiple nodes
+node_ids <- client$create_nodes(list(
+  list(labels = c("City"), properties = list(name = "San Francisco", state = "CA")),
+  list(labels = c("City"), properties = list(name = "New York", state = "NY")),
+  list(labels = c("City"), properties = list(name = "Austin", state = "TX"))
+))
+
+# Create multiple edges
+edge_ids <- client$create_edges(list(
+  list(source = alice_id, target = node_ids[1], edge_type = "LIVES_IN"),
+  list(source = bob_id,   target = node_ids[2], edge_type = "LIVES_IN"),
+  list(source = carol_id, target = node_ids[3], edge_type = "LIVES_IN",
+       weight = 0.8)
+))
+```
+
+### Batch Delete
+
+```{r batch-delete}
+# Delete multiple nodes (also removes their edges)
+deleted_count <- client$delete_nodes(node_ids)
+cat(deleted_count, "nodes deleted\n")
+
+# Delete multiple edges
+deleted_edges <- client$delete_edges(edge_ids)
+```
+
+Batch delete operations silently skip any IDs that do not exist or have
+already been deleted, and return the count of successful deletions.
+
+## Data Frame Integration
+
+The package provides import and export helpers that bridge between R data
+frames and the AstraeaDB graph.
+
+### Importing Nodes from a Data Frame
+
+```{r import-nodes-df}
+people_df <- data.frame(
+  label = c("Person", "Person", "Person"),
+  name  = c("Dave", "Eve", "Frank"),
+  age   = c(40, 28, 55),
+  city  = c("Chicago", "Boston", "Denver"),
+  stringsAsFactors = FALSE
+)
+
+new_ids <- client$import_nodes_df(people_df, label_col = "label")
+new_ids
+#> [1] 10 11 12
+```
+
+The `label_col` parameter identifies which column holds the node label. All
+other columns become node properties. You can also specify `embedding_cols`
+if some columns should be assembled into an embedding vector:
+
+```{r import-nodes-embedding}
+embed_df <- data.frame(
+  label = c("Document", "Document"),
+  title = c("Doc A", "Doc B"),
+  e1    = c(0.1, 0.4),
+  e2    = c(0.9, 0.5),
+  e3    = c(0.3, 0.8),
+  stringsAsFactors = FALSE
+)
+
+doc_ids <- client$import_nodes_df(
+  embed_df,
+  label_col      = "label",
+  embedding_cols = c("e1", "e2", "e3")
+)
+```
+
+### Importing Edges from a Data Frame
+
+```{r import-edges-df}
+edges_df <- data.frame(
+  source = new_ids[c(1, 2)],
+  target = new_ids[c(2, 3)],
+  type   = c("KNOWS", "MENTORS"),
+  since  = c(2018, 2021),
+  stringsAsFactors = FALSE
+)
+
+edge_ids <- client$import_edges_df(
+  edges_df,
+  source_col = "source",
+  target_col = "target",
+  type_col   = "type"
+)
+```
+
+Additional column-mapping parameters are available: `weight_col`,
+`valid_from_col`, and `valid_to_col`. All columns not mapped to a structural
+role become edge properties.
+
+### Exporting Nodes to a Data Frame
+
+```{r export-nodes-df}
+df <- client$export_nodes_df(new_ids)
+df
+#>   node_id labels   name age    city
+#> 1      10 Person   Dave  40 Chicago
+#> 2      11 Person    Eve  28  Boston
+#> 3      12 Person  Frank  55  Denver
+```
+
+The exported data frame contains a `node_id` column, a comma-separated
+`labels` column, and one column per property. Nodes with different property
+sets are aligned; missing properties are filled with `NA`.
+
+### Exporting BFS Results to a Data Frame
+
+```{r export-bfs-df}
+bfs_df <- client$export_bfs_df(alice_id, max_depth = 2L)
+bfs_df
+#>   node_id depth labels   name age          city
+#> 1       1     0 Person  Alice  30 San Francisco
+#> 2       2     1 Person    Bob  25      New York
+#> 3       3     2 Person  Carol  35          <NA>
+```
+
+This runs a BFS internally, then fetches each visited node and flattens the
+results into a data frame with an additional `depth` column.
+
+## Disconnecting
+
+Always disconnect when you are done. This closes the underlying TCP socket:
+
+```{r disconnect}
+client$disconnect()
+```
+
+A good pattern for scripts is to use `on.exit()` to guarantee cleanup:
+```{r on-exit}
+client <- astraea_connect()
+on.exit(client$disconnect(), add = TRUE)
+
+# ... do work ...
+```
+
+## Error Handling
+
+All client methods signal R errors when the server returns an error response
+or the connection fails. Use `tryCatch()` to handle errors gracefully:
+
+```{r error-handling}
+tryCatch(
+  {
+    node <- client$get_node(999999L)
+  },
+  error = function(e) {
+    message("Operation failed: ", conditionMessage(e))
+  }
+)
+```
+
+Typical error scenarios include:
+
+- **Connection refused** -- The server is not running or the port is wrong.
+- **Node/edge not found** -- The requested ID does not exist.
+- **Validation errors** -- Invalid parameters (e.g., empty labels,
+  non-numeric embedding).
+- **Authentication errors** -- Missing or invalid `auth_token`.
+
+You can check whether the server is reachable before attempting to connect:
+
+```{r check-available}
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  # ... work ...
+  client$disconnect()
+} else {
+  message("AstraeaDB server is not available.")
+}
+```
+
+## Summary
+
+This vignette covered the core workflow for interacting with AstraeaDB from
+R:
+
+1. Start the server and connect from R.
+2. Create, read, update, and delete nodes and edges.
+3. Traverse the graph with neighbors, BFS, and shortest-path queries.
+4. Run GQL queries for declarative pattern matching.
+5. Use batch and data-frame helpers for bulk operations.
+6. Handle errors and clean up connections.
+
+For vector search, temporal queries, GraphRAG, and Arrow Flight transport,
+see `vignette("advanced-features")`.

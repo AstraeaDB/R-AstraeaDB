@@ -1,0 +1,643 @@
+---
+title: "Advanced Features: Vector Search, Temporal Queries, and GraphRAG"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced Features: Vector Search, Temporal Queries, and GraphRAG}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+This vignette covers the advanced capabilities of the AstraeaDB R package:
+vector similarity search, hybrid and semantic search, temporal (time-travel)
+queries, GraphRAG for LLM integration, Apache Arrow Flight transport, and
+authentication.
+
+All examples assume you have a running AstraeaDB server and a connected
+client:
+
+```{r connect}
+library(AstraeaDB)
+client <- astraea_connect()
+```
+
+## Vector Search
+
+### Creating Nodes with Embeddings
+
+Any node can carry a dense embedding vector. Pass the `embedding` argument
+when creating the node:
+
+```{r create-embeddings}
+# Create nodes representing documents, each with a 4-dimensional embedding
+doc1 <- client$create_node(
+  labels     = c("Document"),
+  properties = list(title = "Graph Databases", topic = "databases"),
+  embedding  = c(0.9, 0.1, 0.2, 0.05)
+)
+
+doc2 <- client$create_node(
+  labels     = c("Document"),
+  properties = list(title = "Vector Search", topic = "search"),
+  embedding  = c(0.1, 0.85, 0.3, 0.1)
+)
+
+doc3 <- client$create_node(
+  labels     = c("Document"),
+  properties = list(title = "Neural Networks", topic = "ML"),
+  embedding  = c(0.15, 0.8, 0.9, 0.7)
+)
+
+doc4 <- client$create_node(
+  labels     = c("Document"),
+  properties = list(title = "Knowledge Graphs", topic = "databases"),
+  embedding  = c(0.85, 0.2, 0.25, 0.1)
+)
+```
+
+Embedding dimensionality is flexible -- AstraeaDB does not enforce a fixed
+size, though all embeddings used together in a search should share the same
+dimensionality.
+
+### k-Nearest Neighbor Search
+
+Use `vector_search()` to find the `k` nodes whose embeddings are most
+similar to a query vector:
+
+```{r vector-search}
+results <- client$vector_search(
+  query_vector = c(0.88, 0.15, 0.2, 0.08),
+  k            = 3L
+)
+
+for (r in results) {
+  cat(sprintf("Node %d -- similarity: %.4f\n", r$node_id, r$similarity))
+}
+#> Node 1 -- similarity: 0.9952
+#> Node 4 -- similarity: 0.9871
+#> Node 2 -- similarity: 0.4123
+```
+
+Each result entry contains at least `node_id` and `similarity`. The
+similarity metric is determined by the server configuration (typically cosine
+similarity).
+
+## Hybrid Search
+
+Hybrid search combines **graph proximity** (how close a node is to an anchor
+node in the graph) with **vector similarity** (how close its embedding is to
+a query vector). The `alpha` parameter controls the blend:
+
+- `alpha = 0.0` -- Pure graph proximity (closer in hops = higher rank).
+- `alpha = 1.0` -- Pure vector similarity (ignore graph structure).
+- `alpha = 0.5` -- Equal weight to both signals.
+
+```{r hybrid-search}
+# Find nodes that are both near doc1 in the graph AND similar to a query vector
+results <- client$hybrid_search(
+  anchor       = doc1,
+  query_vector = c(0.8, 0.3, 0.25, 0.1),
+  max_hops     = 3L,
+  k            = 5L,
+  alpha        = 0.7
+)
+
+for (r in results) {
+  cat(sprintf("Node %d -- combined score: %.4f\n", r$node_id, r$score))
+}
+```
+
+**Use case:** In a knowledge base, you want to find documents that are
+topically similar to a query (vector similarity) and also structurally
+related to a known starting point (graph proximity). By tuning `alpha` you
+can control how much the graph structure influences the ranking.
+
+## Semantic Search
+
+Semantic search operations use a "concept" embedding to rank or navigate
+the graph. Unlike vector search, which operates globally, semantic search
+is local -- it starts from a specific node and considers only its
+neighborhood.
+
+### Semantic Neighbors
+
+`semantic_neighbors()` retrieves the neighbors of a node and ranks them by
+how similar their embeddings are to a concept vector:
+
+```{r semantic-neighbors}
+# First, connect the documents with edges
+client$create_edge(doc1, doc2, "RELATED_TO")
+client$create_edge(doc1, doc3, "RELATED_TO")
+client$create_edge(doc1, doc4, "RELATED_TO")
+
+# Rank doc1's neighbors by similarity to a "search-oriented" concept
+ranked <- client$semantic_neighbors(
+  node_id   = doc1,
+  concept   = c(0.1, 0.9, 0.3, 0.1),
+  direction = "outgoing",
+  k         = 5L
+)
+
+for (r in ranked) {
+  cat(sprintf("Neighbor %d -- similarity: %.4f\n", r$node_id, r$similarity))
+}
+```
+
+### Semantic Walk
+
+`semantic_walk()` performs a greedy traversal of the graph. At each step it
+moves to the neighbor whose embedding is most similar to the concept vector:
+
+```{r semantic-walk}
+# Walk the graph following the "ML" concept
+path <- client$semantic_walk(
+  start    = doc1,
+  concept  = c(0.1, 0.8, 0.9, 0.7),
+  max_hops = 4L
+)
+
+cat("Walk path:", paste(path, collapse = " -> "), "\n")
+```
+
+This is useful for exploring how a topic "flows" through a knowledge graph.
+
+## Temporal Queries (Time-Travel)
+
+AstraeaDB edges can have temporal validity windows. When an edge has
+`valid_from` and/or `valid_to` set (milliseconds since the Unix epoch), it
+is only visible in temporal queries whose timestamp falls within the window.
+
+### Setting Up Temporal Edges
+
+```{r temporal-setup}
+# Create a social network with temporal edges
+alice <- client$create_node(c("Person"), list(name = "Alice"))
+bob   <- client$create_node(c("Person"), list(name = "Bob"))
+carol <- client$create_node(c("Person"), list(name = "Carol"))
+dave  <- client$create_node(c("Person"), list(name = "Dave"))
+
+# Helper: convert date string to epoch milliseconds
+to_epoch_ms <- function(date_str) {
+  as.numeric(as.POSIXct(date_str, tz = "UTC")) * 1000
+}
+
+# Alice knew Bob from 2020 to 2022
+client$create_edge(
+  source     = alice,
+  target     = bob,
+  edge_type  = "FRIENDS",
+  valid_from = to_epoch_ms("2020-01-01"),
+  valid_to   = to_epoch_ms("2022-01-01")
+)
+
+# Alice has known Carol since 2021 (no end date -- still active)
+client$create_edge(
+  source     = alice,
+  target     = carol,
+  edge_type  = "FRIENDS",
+  valid_from = to_epoch_ms("2021-06-01")
+)
+
+# Alice has known Dave since 2023
+client$create_edge(
+  source     = alice,
+  target     = dave,
+  edge_type  = "FRIENDS",
+  valid_from = to_epoch_ms("2023-01-01")
+)
+```
+
+### Querying at a Point in Time
+
+#### neighbors_at
+
+```{r neighbors-at}
+# Who was Alice friends with on July 1, 2021?
+mid_2021 <- to_epoch_ms("2021-07-01")
+friends_2021 <- client$neighbors_at(alice, "outgoing", mid_2021)
+
+# Result includes Bob and Carol, but not Dave (not yet friends)
+for (f in friends_2021) {
+  node <- client$get_node(f$node_id)
+  cat(node$properties$name, "\n")
+}
+#> Bob
+#> Carol
+```
+
+#### bfs_at
+
+```{r bfs-at}
+# BFS at a point in time
+bfs_2021 <- client$bfs_at(alice, max_depth = 2L, timestamp = mid_2021)
+
+for (entry in bfs_2021) {
+  cat(sprintf("Node %d at depth %d\n", entry$node_id, entry$depth))
+}
+```
+
+#### shortest_path_at
+
+```{r shortest-path-at}
+# Shortest path at a specific time
+early_2024 <- to_epoch_ms("2024-01-15")
+
+sp <- client$shortest_path_at(
+  from_node = alice,
+  to_node   = dave,
+  timestamp = early_2024,
+  weighted  = FALSE
+)
+
+cat("Path:", paste(sp$path, collapse = " -> "), "\n")
+cat("Hops:", sp$length, "\n")
+```
+
+### Use Case: Evolving Relationships
+
+Temporal queries allow you to answer questions such as:
+
+- "Who were Alice's collaborators in Q3 2022?"
+- "What did the team structure look like before the reorg?"
+- "How has the shortest communication path between two people changed over
+  time?"
+
+By sweeping a timestamp across a range, you can reconstruct the evolution
+of a graph.
+
+## GraphRAG
+
+GraphRAG integrates graph data with large language models. AstraeaDB provides
+two methods:
+
+1. **`extract_subgraph()`** -- Extracts a subgraph centered on a node and
+   linearizes it to text.
+2. **`graph_rag()`** -- Full pipeline that extracts a subgraph, linearizes
+   it, and sends the context and a question to a language model.
+
+### Subgraph Extraction
+
+```{r extract-subgraph}
+# Extract a 2-hop subgraph around Alice, linearized as structured text
+sg <- client$extract_subgraph(
+  center    = alice,
+  hops      = 2L,
+  max_nodes = 20L,
+  format    = "structured"
+)
+
+cat("Nodes:", sg$node_count, "\n")
+cat("Edges:", sg$edge_count, "\n")
+cat("\n", sg$text, "\n")
+```
+
+The `format` parameter controls how the subgraph is serialized:
+
+| Format         | Description                                                |
+|:---------------|:-----------------------------------------------------------|
+| `"structured"` | Indented, human-readable summary of nodes and edges.       |
+| `"prose"`      | Natural-language narrative describing the subgraph.        |
+| `"triples"`    | List of `(subject, predicate, object)` triples.            |
+| `"json"`       | Machine-readable JSON representation.                      |
+
+### Full GraphRAG Pipeline
+
+`graph_rag()` sends the extracted subgraph context along with your question
+to the language model configured on the server:
+
+```{r graph-rag}
+answer <- client$graph_rag(
+  question  = "Who are Alice's current friends and what do they work on?",
+  anchor    = alice,
+  hops      = 2L,
+  max_nodes = 30L,
+  format    = "prose"
+)
+
+cat(answer$answer, "\n")
+```
+
+You can also provide a `question_embedding` instead of (or in addition to) an
+`anchor` node. This lets the server find the most relevant anchor automatically
+via vector search:
+
+```{r graph-rag-embedding}
+answer <- client$graph_rag(
+  question            = "What research topics are related to graph databases?",
+  question_embedding  = c(0.9, 0.1, 0.2, 0.05),
+  hops                = 3L,
+  max_nodes           = 50L,
+  format              = "structured"
+)
+
+cat(answer$answer, "\n")
+```
+
+## Anomaly Detection
+
+AstraeaDB includes a built-in anomaly detection system based on the "deja vu"
+algorithm. It monitors entity behavior over time and flags nodes or edges
+whose recent activity deviates significantly from their historical baseline.
+
+### Checking an Entity
+
+Use `anomaly_check()` to get the anomaly status of a specific node or edge:
+
+```{r anomaly-check}
+# Check anomaly status of a node
+result <- client$anomaly_check(alice)
+
+# Check an edge instead
+edge_result <- client$anomaly_check(5L, is_node = FALSE)
+```
+
+If the entity has not been active long enough for anomaly detection to have
+data, the server returns a message indicating no data is available yet.
+
+### Detailed Statistics
+
+`anomaly_stats()` returns more detailed information, including historical
+scores and thresholds:
+```{r anomaly-stats}
+stats <- client$anomaly_stats(alice)
+```
+
+### Active Alerts
+
+`anomaly_alerts()` returns all currently active anomaly alerts across the
+entire graph:
+
+```{r anomaly-alerts}
+alerts <- client$anomaly_alerts()
+for (a in alerts) {
+  cat(sprintf("Entity %d: anomaly detected\n", a$id))
+}
+```
+
+Anomaly detection is passive -- the server continuously monitors activity in
+the background. No explicit training step is required.
+
+## Arrow Flight Transport
+
+For large result sets and analytical workloads, the Arrow Flight transport
+provides significantly better performance than JSON/TCP. Arrow Flight uses
+Apache Arrow's columnar format for zero-copy data exchange between the server
+and R.
+
+### When to Use Arrow Flight
+
+- **Large GQL query results** -- Hundreds of thousands of rows or more.
+- **Analytical pipelines** -- When results will be processed with columnar
+  tools (dplyr, data.table, Arrow compute).
+- **Streaming ingestion** -- Processing results in batches to bound memory
+  usage.
+
+For small CRUD operations (create a node, get an edge), JSON/TCP is
+perfectly adequate and has no extra dependencies.
+
+### ArrowClient (Direct Use)
+
+The `ArrowClient` class communicates directly with the Arrow Flight endpoint
+(default port 7689). It requires the `arrow` package.
+
+```{r arrow-client}
+# install.packages("arrow")  # if not already installed
+library(AstraeaDB)
+
+ac <- ArrowClient$new("grpc://localhost:7689")
+ac$connect()
+
+# Execute a GQL query -- returns an Arrow Table
+table <- ac$query("MATCH (p:Person) RETURN p.name, p.age")
+
+# Convert to data.frame
+df <- as.data.frame(table)
+
+# Or use the convenience method
+df <- ac$query_df("MATCH (p:Person) RETURN p.name, p.age")
+```
+
+For very large result sets, stream the results in batches to control memory
+usage:
+
+```{r arrow-batches}
+ac$query_batches(
+  "MATCH (n) RETURN n",
+  callback = function(batch) {
+    cat("Received batch with", nrow(batch), "rows\n")
+    # Process each batch incrementally
+  }
+)
+
+ac$disconnect()
+```
+
+You can also use the convenience wrapper:
+
+```{r arrow-convenience}
+ac <- astraea_arrow_connect("grpc://localhost:7689")
+# ... work ...
+ac$disconnect()
+```
+
+### UnifiedClient (Automatic Transport Selection)
+
+The `UnifiedClient` is the recommended choice when you want the best of both
+worlds. It delegates CRUD operations to the JSON/TCP client and routes GQL
+queries through Arrow Flight when the `arrow` package is installed:
+
+```{r unified-client}
+uc <- UnifiedClient$new(
+  host       = "127.0.0.1",
+  port       = 7687L,
+  flight_uri = "grpc://localhost:7689"
+)
+uc$connect()
+
+# Check which transports are active
+uc$is_arrow_enabled()
+#> [1] TRUE
+
+# CRUD operations go through JSON/TCP
+node_id <- uc$create_node(c("Person"), list(name = "Grace", age = 42))
+
+# Queries go through Arrow Flight (or fall back to JSON/TCP)
+df <- uc$query_df("MATCH (p:Person) RETURN p.name, p.age")
+
+# All other operations are available as usual
+uc$neighbors(node_id, direction = "outgoing")
+uc$vector_search(c(0.5, 0.5, 0.5, 0.5), k = 3L)
+
+uc$disconnect()
+```
+
+If the `arrow` package is not installed, or if the Arrow Flight connection
+fails, the `UnifiedClient` silently falls back to JSON/TCP for everything.
+A message is printed when fallback occurs.
+
+## Authentication
+
+AstraeaDB supports token-based authentication with server-side role-based
+access control (RBAC). Three roles are available:
+
+| Role     | Permissions                                       |
+|:---------|:--------------------------------------------------|
+| Reader   | Read-only: get nodes/edges, traversals, queries.  |
+| Writer   | Read and write: CRUD, batch, import/export.       |
+| Admin    | Full access: all operations plus server management.|
+
+### Using an Auth Token
+
+Pass the `auth_token` parameter when creating any client. The token is
+automatically attached to every request:
+
+```{r auth-token}
+# AstraeaClient with authentication
+client <- AstraeaClient$new(
+  host       = "127.0.0.1",
+  port       = 7687L,
+  auth_token = "my-secret-token"
+)
+client$connect()
+
+# All operations now carry the token
+client$ping()
+client$create_node(c("Person"), list(name = "Secured"))
+client$disconnect()
+```
+
+The convenience function also accepts a token:
+
+```{r auth-connect}
+client <- astraea_connect(auth_token = "my-secret-token")
+# ... work ...
+client$disconnect()
+```
+
+The `UnifiedClient` passes the token to the JSON/TCP client:
+
+```{r auth-unified}
+uc <- UnifiedClient$new(
+  host       = "127.0.0.1",
+  port       = 7687L,
+  auth_token = "my-secret-token"
+)
+uc$connect()
+# ... work ...
+uc$disconnect()
+```
+
+### Handling Authentication Errors
+
+If the token is missing, invalid, or the user's role lacks the required
+permissions, the server returns an error. Handle it with `tryCatch()`:
+
+```{r auth-error}
+tryCatch(
+  {
+    client <- astraea_connect(auth_token = "wrong-token")
+    client$create_node(c("Test"), list(x = 1))
+  },
+  error = function(e) {
+    message("Auth error: ", conditionMessage(e))
+  }
+)
+```
+
+## Putting It All Together
+
+The following example builds a small knowledge graph with embeddings and
+temporal edges, then demonstrates vector search, hybrid search, temporal
+queries, and GraphRAG in a single workflow:
+
+```{r full-workflow}
+library(AstraeaDB)
+client <- astraea_connect()
+on.exit(client$disconnect(), add = TRUE)
+
+# --- Build the graph ---
+ml   <- client$create_node(c("Topic"), list(name = "Machine Learning"),
+                            embedding = c(0.1, 0.8, 0.9, 0.7))
+nlp  <- client$create_node(c("Topic"), list(name = "NLP"),
+                            embedding = c(0.2, 0.9, 0.7, 0.6))
+kg   <- client$create_node(c("Topic"), list(name = "Knowledge Graphs"),
+                            embedding = c(0.85, 0.2, 0.25, 0.1))
+rag  <- client$create_node(c("Topic"), list(name = "RAG"),
+                            embedding = c(0.6, 0.7, 0.5, 0.4))
+
+to_ms <- function(d) as.numeric(as.POSIXct(d, tz = "UTC")) * 1000
+
+client$create_edge(ml,  nlp, "RELATED_TO", weight = 0.9,
+                   valid_from = to_ms("2018-01-01"))
+client$create_edge(nlp, rag, "ENABLES",    weight = 0.8,
+                   valid_from = to_ms("2022-01-01"))
+client$create_edge(kg,  rag, "ENABLES",    weight = 0.85,
+                   valid_from = to_ms("2020-01-01"))
+client$create_edge(ml,  kg,  "RELATED_TO", weight = 0.7,
+                   valid_from = to_ms("2015-01-01"))
+
+# --- Vector search ---
+cat("== Vector Search ==\n")
+vs <- client$vector_search(c(0.15, 0.85, 0.8, 0.65), k = 2L)
+for (r in vs) {
+  cat(sprintf("  Node %d (sim %.4f)\n", r$node_id, r$similarity))
+}
+
+# --- Hybrid search ---
+cat("\n== Hybrid Search ==\n")
+hs <- client$hybrid_search(
+  anchor = ml, query_vector = c(0.6, 0.7, 0.5, 0.4),
+  max_hops = 2L, k = 3L, alpha = 0.5
+)
+for (r in hs) {
+  cat(sprintf("  Node %d\n", r$node_id))
+}
+
+# --- Temporal query ---
+cat("\n== Temporal Query (2019) ==\n")
+nbrs_2019 <- client$neighbors_at(ml, "outgoing", to_ms("2019-06-01"))
+for (n in nbrs_2019) {
+  node <- client$get_node(n$node_id)
+  cat(sprintf("  %s\n", node$properties$name))
+}
+# Only "NLP" and "Knowledge Graphs" -- RAG edge did not exist in 2019
+
+# --- GraphRAG ---
+cat("\n== GraphRAG ==\n")
+answer <- client$graph_rag(
+  question  = "How are ML and RAG connected?",
+  anchor    = ml,
+  hops      = 2L,
+  max_nodes = 20L,
+  format    = "prose"
+)
+cat(answer$answer, "\n")
+```
+
+## Summary
+
+This vignette demonstrated the advanced features of the AstraeaDB R package:
+
+- **Vector search** finds nodes by embedding similarity.
+- **Hybrid search** blends graph proximity with vector similarity.
+- **Semantic search** ranks neighbors or walks the graph by concept
+  similarity.
+- **Temporal queries** let you explore the graph as it existed at any point
+  in time.
+- **GraphRAG** extracts subgraph context for LLM-powered question answering.
+- **Anomaly detection** monitors entity behavior and flags deviations using
+  the "deja vu" algorithm.
+- **Arrow Flight** enables high-performance columnar data transfer for
+  analytical workloads.
+- **Authentication** secures access with token-based RBAC.
+
+For basic CRUD operations, traversals, GQL queries, and data-frame helpers,
+see `vignette("getting-started")`. For an overview of the package and data
+model, see `vignette("introduction")`.

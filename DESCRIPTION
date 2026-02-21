@@ -1,0 +1,32 @@
+Package: AstraeaDB
+Type: Package
+Title: Client for the 'AstraeaDB' Graph Database
+Version: 0.1.0
+Authors@R: person("James", "Harris", role = c("aut", "cre"),
+    email = "james@example.com")
+Description: Provides an R client for 'AstraeaDB', a cloud-native graph database
+    with vector search capabilities. Supports node and edge CRUD operations,
+    graph traversals (BFS, shortest path), temporal queries, vector similarity
+    search, hybrid graph-vector search, 'GQL' query execution, and
+    'GraphRAG' (subgraph extraction with LLM integration). Communicates with
+    the 'AstraeaDB' server over a JSON-over-TCP protocol. An optional
+    'Apache Arrow Flight' transport is available for high-performance bulk
+    operations when the 'arrow' package is installed.
+License: MIT + file LICENSE
+URL: https://github.com/astraeadb/astraeadb
+BugReports: https://github.com/astraeadb/astraeadb/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends: R (>= 3.5.0)
+Imports:
+    jsonlite,
+    R6
+Suggests:
+    arrow,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+VignetteBuilder: knitr

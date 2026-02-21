@@ -1,0 +1,218 @@
+---
+title: "Introduction to AstraeaDB"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to AstraeaDB}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+## What is AstraeaDB?
+
+AstraeaDB is a cloud-native, AI-first graph database written in Rust. It is
+designed from the ground up for workloads that combine traditional graph
+analytics with modern vector similarity search and retrieval-augmented
+generation (RAG). Its core data model is the **Vector-Property Graph**, which
+extends the classical property graph with dense vector embeddings and temporal
+edge validity windows.
+
+Key characteristics of AstraeaDB include:
+
+- **High performance** -- Written in Rust for memory-safe, concurrent
+  execution.
+- **Vector-native** -- Every node can carry a dense embedding vector for
+  k-nearest neighbor search.
+- **Temporal edges** -- Each edge can have a validity window
+  (`valid_from` / `valid_to` in epoch milliseconds), enabling time-travel
+  queries over the graph.
+- **Multiple transports** -- JSON/TCP, gRPC, and Apache Arrow Flight
+  endpoints run simultaneously.
+- **Built-in GraphRAG** -- Subgraph extraction and linearization for direct
+  integration with large language models.
+
+## The Vector-Property Graph Data Model
+
+AstraeaDB organises data into **nodes** and **edges**:
+
+**Nodes** have:
+
+- One or more **labels** (character vector, e.g., `c("Person", "Engineer")`).
+- A set of **properties** (named list, e.g., `list(name = "Alice", age = 30)`).
+- An optional dense **embedding** vector (numeric vector, e.g.,
+  `c(0.12, 0.87, 0.45, ...)`).
+
+**Edges** have:
+
+- A **source** and **target** node (by ID).
+- An **edge type** (character scalar, e.g., `"KNOWS"`).
+- A set of **properties** (named list).
+- A numeric **weight** (default 1.0).
+- An optional **temporal validity window**: `valid_from` and `valid_to`, both
+  expressed as milliseconds since the Unix epoch. Only edges whose window
+  includes the query timestamp are visible in temporal queries.
+
+## Transport Options
+
+AstraeaDB exposes three network endpoints simultaneously:
+
+| Transport     | Default Port | Protocol                | Best For                      |
+|:--------------|:-------------|:------------------------|:------------------------------|
+| JSON/TCP      | 7687         | Line-delimited JSON     | General CRUD, interactive use |
+| gRPC          | 7688         | Protocol Buffers        | Service-to-service calls      |
+| Arrow Flight  | 7689         | Apache Arrow Flight     | Bulk queries, analytics       |
+
+The **AstraeaDB** R package provides three client classes that map to these
+transports:
+
+- `AstraeaClient` -- JSON/TCP client (always available, no extra
+  dependencies).
+- `ArrowClient` -- Arrow Flight client (requires the optional `arrow`
+  package).
+- `UnifiedClient` -- Automatically selects the best transport. CRUD
+  operations go through JSON/TCP; GQL queries use Arrow Flight when the
+  `arrow` package is installed, falling back to JSON/TCP otherwise.
+
+For most users, `AstraeaClient` or the convenience function
+`astraea_connect()` is the recommended starting point.
+
+## Key Features at a Glance
+
+The R package exposes the full AstraeaDB feature set:
+
+- **CRUD operations** -- Create, read, update, and delete nodes and edges.
+- **Graph traversals** -- Breadth-first search, shortest path (weighted and
+  unweighted), neighbor queries with direction and edge-type filtering.
+- **Temporal queries** -- Time-travel versions of neighbors, BFS, and
+  shortest path that respect edge validity windows.
+- **Vector search** -- k-nearest neighbor search over node embeddings.
+- **Hybrid search** -- Combined graph proximity and vector similarity
+  ranking controlled by an `alpha` blending parameter.
+- **Semantic search** -- Rank neighbors by concept similarity; greedy
+  semantic walks that follow the most similar edges.
+- **GQL queries** -- Execute Graph Query Language statements with
+  `MATCH` / `WHERE` / `RETURN` / `ORDER BY` / `LIMIT` syntax.
+- **GraphRAG** -- Extract subgraphs and linearize them to text for LLM
+  consumption; a full `graph_rag()` pipeline that answers natural-language
+  questions using graph context.
+- **Batch and data-frame operations** -- Bulk import nodes and edges from
+  data frames; export query results back to data frames.
+- **Authentication** -- Token-based authentication with server-side RBAC.
+
+## Installation
+
+### From CRAN (when available)
+
+```{r install-cran}
+install.packages("AstraeaDB")
+```
+
+### Development Version from GitHub
+
+```{r install-github}
+# install.packages("remotes")
+remotes::install_github("astraeadb/astraeadb")
+```
+
+### Optional: Arrow Flight Support
+
+To enable the high-performance Arrow Flight transport, install the `arrow`
+package:
+
+```{r install-arrow}
+install.packages("arrow")
+```
+
+## Prerequisites
+
+Before using the R package, you must have an AstraeaDB server running and
+accessible on the network. You can start a local development server with:
+
+```{bash start-server}
+# From the AstraeaDB source directory
+cargo run -p astraea-cli -- serve
+```
+
+By default the server listens on:
+
+- `127.0.0.1:7687` (JSON/TCP)
+- `127.0.0.1:7688` (gRPC)
+- `127.0.0.1:7689` (Arrow Flight)
+
+You can verify the server is reachable from R before connecting:
+
+```{r check-server}
+library(AstraeaDB)
+astraea_server_available()
+#> [1] TRUE
+```
+
+## Quick Start Example
+
+The following example connects to a local server, creates two nodes and an
+edge, queries the graph, and then disconnects.
+
+```{r quickstart}
+library(AstraeaDB)
+
+# 1. Connect to the server (convenience wrapper)
+client <- astraea_connect()
+
+# 2. Health check
+client$ping()
+
+# 3. Create nodes
+alice_id <- client$create_node(
+  labels     = c("Person"),
+  properties = list(name = "Alice", age = 30, city = "San Francisco")
+)
+
+bob_id <- client$create_node(
+  labels     = c("Person"),
+  properties = list(name = "Bob", age = 25, city = "New York")
+)
+
+# 4. Create an edge
+edge_id <- client$create_edge(
+  source    = alice_id,
+  target    = bob_id,
+  edge_type = "KNOWS",
+  properties = list(since = 2020),
+  weight    = 0.9
+)
+
+# 5. Read a node back
+node <- client$get_node(alice_id)
+node$labels
+#> [1] "Person"
+node$properties$name
+#> [1] "Alice"
+
+# 6. Find neighbors
+neighbors <- client$neighbors(alice_id, direction = "outgoing")
+
+# 7. Run a GQL query
+result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+
+# 8. Disconnect when finished
+client$disconnect()
+```
+
+## Where to Go Next
+
+- **Getting Started** (`vignette("getting-started")`) -- Detailed
+  walkthrough of all CRUD operations, traversals, GQL queries, batch
+  operations, and data-frame integration.
+- **Advanced Features** (`vignette("advanced-features")`) -- Vector search,
+  hybrid search, temporal queries, GraphRAG, Arrow Flight transport, and
+  authentication.
+- **Function reference** -- Use `?AstraeaClient`, `?ArrowClient`,
+  `?UnifiedClient`, or `?astraea_connect` to access the full API
+  documentation.

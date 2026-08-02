@@ -9,3 +9,10 @@
 ^pkgdown$
 ^\.claude$
 ^CLAUDE\.md$
+^\.RData$
+^\.Rhistory$
+\.DS_Store$
+^pcap\.md$
+^cran-comments\.md$
+^CRAN-SUBMISSION$
+^vignettes/.*\.html$

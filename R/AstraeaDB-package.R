@@ -18,16 +18,19 @@
 #' \itemize{
 #'   \item \strong{Node and Edge CRUD}: Create, read, update, and delete nodes
 #'     and edges with arbitrary properties.
-#'   \item \strong{Graph Traversals}: BFS, shortest path (weighted/unweighted).
+#'   \item \strong{Graph Traversals}: BFS, DFS, shortest path
+#'     (weighted/unweighted).
+#'   \item \strong{Lookups}: Find nodes by label and edges by type.
 #'   \item \strong{Temporal Queries}: Query the graph at specific points in time
 #'     using edge validity intervals.
+#'   \item \strong{Graph Algorithms}: PageRank, Louvain community detection,
+#'     connected components, and degree/betweenness centrality.
 #'   \item \strong{Vector Search}: k-nearest-neighbor search using HNSW index.
 #'   \item \strong{Hybrid Search}: Combine graph proximity with vector
 #'     similarity.
 #'   \item \strong{GQL Queries}: Execute GQL/Cypher query strings.
 #'   \item \strong{GraphRAG}: Extract subgraphs and generate LLM context.
-#'   \item \strong{Anomaly Detection}: Monitor entity behavior and detect
-#'     anomalies using the "deja vu" algorithm.
+#'   \item \strong{Statistics}: Graph-wide counts and raw subgraph export.
 #'   \item \strong{Data Frame Integration}: Import/export between data frames
 #'     and the graph.
 #' }

@@ -118,7 +118,7 @@ install.packages("AstraeaDB")
 
 ```{r install-github}
 # install.packages("remotes")
-remotes::install_github("astraeadb/astraeadb")
+remotes::install_github("AstraeaDB/R-AstraeaDB")
 ```
 
 ### Optional: Arrow Flight Support

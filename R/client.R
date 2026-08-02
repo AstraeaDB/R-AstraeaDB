@@ -12,14 +12,17 @@
 #' The client supports a comprehensive set of operations including:
 #' \itemize{
 #'   \item Node and edge CRUD (create, read, update, delete)
-#'   \item Graph traversals (BFS, shortest path)
+#'   \item Node and edge lookup by label or edge type
+#'   \item Graph traversals (BFS, DFS, shortest path)
 #'   \item Temporal queries (time-travel over edges with validity windows)
+#'   \item Graph algorithms (PageRank, Louvain community detection,
+#'     connected components, degree and betweenness centrality)
 #'   \item GQL query execution
 #'   \item Vector similarity search (k-NN)
 #'   \item Hybrid graph-vector search
 #'   \item Semantic neighbor ranking and semantic walks
 #'   \item GraphRAG (subgraph extraction for LLM integration)
-#'   \item Anomaly detection ("deja vu" algorithm)
+#'   \item Graph statistics and raw subgraph export
 #'   \item Batch and data frame import/export operations
 #' }
 #'
@@ -677,7 +680,9 @@ AstraeaClient <- R6::R6Class(
     #' @param k Integer scalar. Number of nearest neighbors to return.
     #'   Default \code{10L}.
     #' @return A list of result entries, each containing at least
-    #'   \code{node_id} and \code{similarity}.
+    #'   \code{node_id} and \code{distance} (smaller is closer). A legacy
+    #'   \code{score} alias equal to \code{distance} is also present for
+    #'   backward compatibility with older clients.
     #'
     #' @examples
     #' \dontrun{
@@ -762,7 +767,7 @@ AstraeaClient <- R6::R6Class(
     #' @param k Integer scalar. Maximum number of ranked neighbors.
     #'   Default \code{10L}.
     #' @return A list of neighbor entries with \code{node_id} and
-    #'   \code{similarity} scores.
+    #'   \code{distance} (smaller is closer to the concept).
     #'
     #' @examples
     #' \dontrun{
@@ -921,86 +926,316 @@ AstraeaClient <- R6::R6Class(
     },
 
     # ══════════════════════════════════════════════════════════
-    # Anomaly Detection
+    # Depth-First Search
     # ══════════════════════════════════════════════════════════
 
     #' @description
-    #' Check the anomaly status of a node or edge.
+    #' Depth-first search starting from a node.
     #'
-    #' Uses AstraeaDB's "deja vu" anomaly detection algorithm to assess
-    #' whether an entity's recent behavior is anomalous.
-    #'
-    #' @param entity_id Integer scalar. The node or edge ID to check.
-    #' @param is_node Logical scalar. If \code{TRUE} (default), check a
-    #'   node; if \code{FALSE}, check an edge.
-    #' @return A list with anomaly score information, or a message
-    #'   indicating no data is available yet.
+    #' @param start Integer scalar. The starting node ID.
+    #' @param max_depth Integer scalar. Maximum traversal depth.
+    #'   Default \code{3L}.
+    #' @return A list of node IDs (integers) in depth-first visitation order.
     #'
     #' @examples
     #' \dontrun{
-    #' result <- client$anomaly_check(1L)
-    #' result <- client$anomaly_check(5L, is_node = FALSE)
+    #' visited <- client$dfs(1L, max_depth = 2L)
     #' }
-    anomaly_check = function(entity_id, is_node = TRUE) {
+    dfs = function(start, max_depth = 3L) {
       private$assert_connected()
-      entity_id <- as.integer(entity_id)
-      stopifnot(!is.na(entity_id))
-      stopifnot(is.logical(is_node), length(is_node) == 1L)
+      start     <- as.integer(start)
+      max_depth <- as.integer(max_depth)
+      stopifnot(!is.na(start), !is.na(max_depth), max_depth >= 0L)
+      data <- private$check(private$send(list(
+        type      = "Dfs",
+        start     = start,
+        max_depth = max_depth
+      )))
+      data$nodes
+    },
+
+    #' @description
+    #' Depth-first search as of a specific point in time.
+    #'
+    #' @param start Integer scalar. The starting node ID.
+    #' @param max_depth Integer scalar. Maximum traversal depth.
+    #'   Default \code{3L}.
+    #' @param timestamp Numeric scalar. Point in time (ms since epoch).
+    #' @return A list of node IDs (integers) in depth-first visitation
+    #'   order as of \code{timestamp}.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' visited <- client$dfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+    #' }
+    dfs_at = function(start, max_depth = 3L, timestamp) {
+      private$assert_connected()
+      start     <- as.integer(start)
+      max_depth <- as.integer(max_depth)
+      stopifnot(
+        !is.na(start), !is.na(max_depth), max_depth >= 0L,
+        is.numeric(timestamp), length(timestamp) == 1L
+      )
+      data <- private$check(private$send(list(
+        type      = "DfsAt",
+        start     = start,
+        max_depth = max_depth,
+        timestamp = timestamp
+      )))
+      data$nodes
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # Label and Edge-Type Lookups
+    # ══════════════════════════════════════════════════════════
+
+    #' @description
+    #' Find all nodes carrying a given label.
+    #'
+    #' @param label Character scalar. The node label to match.
+    #' @return A list of matching node IDs (integers).
+    #'
+    #' @examples
+    #' \dontrun{
+    #' ids <- client$find_by_label("Person")
+    #' }
+    find_by_label = function(label) {
+      private$assert_connected()
+      stopifnot(is.character(label), length(label) == 1L)
+      data <- private$check(private$send(list(
+        type  = "FindByLabel",
+        label = label
+      )))
+      data$node_ids
+    },
+
+    #' @description
+    #' Find all edges of a given edge type.
+    #'
+    #' @param edge_type Character scalar. The edge type to match.
+    #' @return A list of entries, each a list with \code{edge_id},
+    #'   \code{source}, and \code{target} node IDs.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' edges <- client$find_edge_by_type("KNOWS")
+    #' }
+    find_edge_by_type = function(edge_type) {
+      private$assert_connected()
+      stopifnot(is.character(edge_type), length(edge_type) == 1L)
+      data <- private$check(private$send(list(
+        type      = "FindEdgeByType",
+        edge_type = edge_type
+      )))
+      data$edges
+    },
+
+    #' @description
+    #' Delete every node carrying a given label, along with all its edges.
+    #'
+    #' @param label Character scalar. The node label to match.
+    #' @return Integer scalar: the number of nodes deleted.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' n_removed <- client$delete_by_label("Temporary")
+    #' }
+    delete_by_label = function(label) {
+      private$assert_connected()
+      stopifnot(is.character(label), length(label) == 1L)
+      data <- private$check(private$send(list(
+        type  = "DeleteByLabel",
+        label = label
+      )))
+      as.integer(data$deleted)
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # Subgraph and Statistics
+    # ══════════════════════════════════════════════════════════
+
+    #' @description
+    #' Retrieve the raw subgraph (nodes and edges) around a center node,
+    #' suitable for visualization or client-side processing.
+    #'
+    #' @param center Integer scalar. The center node ID.
+    #' @param hops Integer scalar. Neighborhood radius in hops.
+    #'   Default \code{3L}.
+    #' @param max_nodes Integer scalar. Maximum number of nodes to return.
+    #'   Default \code{50L}.
+    #' @return A list with \code{nodes} (each a list with \code{id},
+    #'   \code{labels}, \code{properties}, \code{has_embedding}) and
+    #'   \code{edges} (each a list with \code{id}, \code{source},
+    #'   \code{target}, \code{edge_type}, \code{properties}, \code{weight},
+    #'   \code{valid_from}, \code{valid_to}).
+    #'
+    #' @examples
+    #' \dontrun{
+    #' sg <- client$get_subgraph(1L, hops = 2L, max_nodes = 100L)
+    #' }
+    get_subgraph = function(center, hops = 3L, max_nodes = 50L) {
+      private$assert_connected()
+      center    <- as.integer(center)
+      hops      <- as.integer(hops)
+      max_nodes <- as.integer(max_nodes)
+      stopifnot(
+        !is.na(center), !is.na(hops), hops >= 0L,
+        !is.na(max_nodes), max_nodes >= 1L
+      )
       private$check(private$send(list(
-        type    = "AnomalyCheck",
-        id      = entity_id,
-        is_node = is_node
+        type      = "GetSubgraph",
+        center    = center,
+        hops      = hops,
+        max_nodes = max_nodes
       )))
     },
 
     #' @description
-    #' Get detailed anomaly statistics for a node or edge.
+    #' Retrieve graph-wide statistics: node and edge counts, per-label
+    #' node counts, and vector-index information when available.
     #'
-    #' Returns more detailed information than \code{anomaly_check()},
-    #' including historical anomaly scores and thresholds.
-    #'
-    #' @param entity_id Integer scalar. The node or edge ID.
-    #' @param is_node Logical scalar. If \code{TRUE} (default), query a
-    #'   node; if \code{FALSE}, query an edge.
-    #' @return A list with detailed anomaly statistics.
+    #' @return A named list of statistics, including \code{total_nodes},
+    #'   \code{total_edges}, and \code{labels} (a per-label node count).
     #'
     #' @examples
     #' \dontrun{
-    #' stats <- client$anomaly_stats(1L)
-    #' stats <- client$anomaly_stats(5L, is_node = FALSE)
+    #' stats <- client$graph_stats()
+    #' stats$total_nodes
     #' }
-    anomaly_stats = function(entity_id, is_node = TRUE) {
+    graph_stats = function() {
       private$assert_connected()
-      entity_id <- as.integer(entity_id)
-      stopifnot(!is.na(entity_id))
-      stopifnot(is.logical(is_node), length(is_node) == 1L)
-      private$check(private$send(list(
-        type    = "AnomalyStats",
-        id      = entity_id,
-        is_node = is_node
-      )))
+      private$check(private$send(list(type = "GraphStats")))
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # Graph Algorithms
+    # ══════════════════════════════════════════════════════════
+
+    #' @description
+    #' Run the PageRank algorithm over the whole graph or a node subset.
+    #'
+    #' @param nodes Optional integer vector. Restrict the computation to
+    #'   these node IDs. \code{NULL} (default) uses the whole graph.
+    #' @param damping Numeric scalar. Damping factor. Default \code{0.85}.
+    #' @param max_iterations Integer scalar. Maximum iterations.
+    #'   Default \code{100L}.
+    #' @param tolerance Numeric scalar. Convergence tolerance.
+    #'   Default \code{1e-6}.
+    #' @return A named list mapping node ID (a character key) to its
+    #'   PageRank score.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' scores <- client$run_pagerank()
+    #' }
+    run_pagerank = function(nodes = NULL, damping = 0.85,
+                            max_iterations = 100L, tolerance = 1e-6) {
+      private$assert_connected()
+      stopifnot(
+        is.numeric(damping), length(damping) == 1L,
+        is.numeric(tolerance), length(tolerance) == 1L
+      )
+      max_iterations <- as.integer(max_iterations)
+      stopifnot(!is.na(max_iterations), max_iterations >= 1L)
+      req <- list(
+        type           = "RunPageRank",
+        damping        = damping,
+        max_iterations = max_iterations,
+        tolerance      = tolerance
+      )
+      if (!is.null(nodes)) req$nodes <- as.list(as.integer(nodes))
+      data <- private$check(private$send(req))
+      data$scores
     },
 
     #' @description
-    #' Get all active anomaly alerts.
+    #' Run Louvain community detection over the whole graph or a subset.
     #'
-    #' Returns a list of currently active anomaly alerts detected by the
-    #' server's "deja vu" algorithm.
-    #'
-    #' @return A list of alert entries. Each entry describes an anomalous
-    #'   entity and its anomaly score.
+    #' @param nodes Optional integer vector. Restrict the computation to
+    #'   these node IDs. \code{NULL} (default) uses the whole graph.
+    #' @return A list with \code{communities} (a named list mapping node ID
+    #'   to community index) and \code{num_communities}.
     #'
     #' @examples
     #' \dontrun{
-    #' alerts <- client$anomaly_alerts()
-    #' for (a in alerts) {
-    #'   cat(sprintf("Entity %d: score %.2f\n", a$id, a$score))
+    #' res <- client$run_louvain()
+    #' res$num_communities
     #' }
-    #' }
-    anomaly_alerts = function() {
+    run_louvain = function(nodes = NULL) {
       private$assert_connected()
-      data <- private$check(private$send(list(type = "AnomalyAlerts")))
-      data$alerts
+      req <- list(type = "RunLouvain")
+      if (!is.null(nodes)) req$nodes <- as.list(as.integer(nodes))
+      private$check(private$send(req))
+    },
+
+    #' @description
+    #' Find connected components of the whole graph or a node subset.
+    #'
+    #' @param nodes Optional integer vector. Restrict the computation to
+    #'   these node IDs. \code{NULL} (default) uses the whole graph.
+    #' @param strong Logical scalar. If \code{TRUE}, compute strongly
+    #'   connected components; otherwise weakly connected. Default
+    #'   \code{FALSE}.
+    #' @return A list with \code{components} (a list of integer vectors of
+    #'   node IDs) and \code{count}.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' cc <- client$run_connected_components()
+    #' cc$count
+    #' }
+    run_connected_components = function(nodes = NULL, strong = FALSE) {
+      private$assert_connected()
+      stopifnot(is.logical(strong), length(strong) == 1L)
+      req <- list(type = "RunConnectedComponents", strong = strong)
+      if (!is.null(nodes)) req$nodes <- as.list(as.integer(nodes))
+      private$check(private$send(req))
+    },
+
+    #' @description
+    #' Compute degree centrality for the whole graph or a node subset.
+    #'
+    #' @param nodes Optional integer vector. Restrict the computation to
+    #'   these node IDs. \code{NULL} (default) uses the whole graph.
+    #' @param direction Character scalar. One of \code{"outgoing"}
+    #'   (default), \code{"incoming"}, or \code{"both"}.
+    #' @return A named list mapping node ID (a character key) to its
+    #'   degree-centrality score.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' scores <- client$run_degree_centrality(direction = "both")
+    #' }
+    run_degree_centrality = function(nodes = NULL, direction = "outgoing") {
+      private$assert_connected()
+      stopifnot(
+        is.character(direction), length(direction) == 1L,
+        direction %in% c("outgoing", "incoming", "both")
+      )
+      req <- list(type = "RunDegreeCentrality", direction = direction)
+      if (!is.null(nodes)) req$nodes <- as.list(as.integer(nodes))
+      data <- private$check(private$send(req))
+      data$scores
+    },
+
+    #' @description
+    #' Compute betweenness centrality for the whole graph or a node subset.
+    #'
+    #' @param nodes Optional integer vector. Restrict the computation to
+    #'   these node IDs. \code{NULL} (default) uses the whole graph.
+    #' @return A named list mapping node ID (a character key) to its
+    #'   betweenness-centrality score.
+    #'
+    #' @examples
+    #' \dontrun{
+    #' scores <- client$run_betweenness_centrality()
+    #' }
+    run_betweenness_centrality = function(nodes = NULL) {
+      private$assert_connected()
+      req <- list(type = "RunBetweennessCentrality")
+      if (!is.null(nodes)) req$nodes <- as.list(as.integer(nodes))
+      data <- private$check(private$send(req))
+      data$scores
     },
 
     # ══════════════════════════════════════════════════════════

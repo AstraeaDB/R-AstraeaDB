@@ -15,14 +15,17 @@ each response contains a \code{"status"} field (\code{"ok"} or
 The client supports a comprehensive set of operations including:
 \itemize{
 \item Node and edge CRUD (create, read, update, delete)
-\item Graph traversals (BFS, shortest path)
+\item Node and edge lookup by label or edge type
+\item Graph traversals (BFS, DFS, shortest path)
 \item Temporal queries (time-travel over edges with validity windows)
+\item Graph algorithms (PageRank, Louvain community detection,
+connected components, degree and betweenness centrality)
 \item GQL query execution
 \item Vector similarity search (k-NN)
 \item Hybrid graph-vector search
 \item Semantic neighbor ranking and semantic walks
 \item GraphRAG (subgraph extraction for LLM integration)
-\item Anomaly detection ("deja vu" algorithm)
+\item Graph statistics and raw subgraph export
 \item Batch and data frame import/export operations
 }
 }
@@ -312,32 +315,102 @@ answer <- client$graph_rag(
 }
 
 ## ------------------------------------------------
-## Method `AstraeaClient$anomaly_check`
+## Method `AstraeaClient$dfs`
 ## ------------------------------------------------
 
 \dontrun{
-result <- client$anomaly_check(1L)
-result <- client$anomaly_check(5L, is_node = FALSE)
+visited <- client$dfs(1L, max_depth = 2L)
 }
 
 ## ------------------------------------------------
-## Method `AstraeaClient$anomaly_stats`
+## Method `AstraeaClient$dfs_at`
 ## ------------------------------------------------
 
 \dontrun{
-stats <- client$anomaly_stats(1L)
-stats <- client$anomaly_stats(5L, is_node = FALSE)
+visited <- client$dfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
 }
 
 ## ------------------------------------------------
-## Method `AstraeaClient$anomaly_alerts`
+## Method `AstraeaClient$find_by_label`
 ## ------------------------------------------------
 
 \dontrun{
-alerts <- client$anomaly_alerts()
-for (a in alerts) {
-  cat(sprintf("Entity \%d: score \%.2f\n", a$id, a$score))
+ids <- client$find_by_label("Person")
 }
+
+## ------------------------------------------------
+## Method `AstraeaClient$find_edge_by_type`
+## ------------------------------------------------
+
+\dontrun{
+edges <- client$find_edge_by_type("KNOWS")
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$delete_by_label`
+## ------------------------------------------------
+
+\dontrun{
+n_removed <- client$delete_by_label("Temporary")
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$get_subgraph`
+## ------------------------------------------------
+
+\dontrun{
+sg <- client$get_subgraph(1L, hops = 2L, max_nodes = 100L)
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$graph_stats`
+## ------------------------------------------------
+
+\dontrun{
+stats <- client$graph_stats()
+stats$total_nodes
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$run_pagerank`
+## ------------------------------------------------
+
+\dontrun{
+scores <- client$run_pagerank()
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$run_louvain`
+## ------------------------------------------------
+
+\dontrun{
+res <- client$run_louvain()
+res$num_communities
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$run_connected_components`
+## ------------------------------------------------
+
+\dontrun{
+cc <- client$run_connected_components()
+cc$count
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$run_degree_centrality`
+## ------------------------------------------------
+
+\dontrun{
+scores <- client$run_degree_centrality(direction = "both")
+}
+
+## ------------------------------------------------
+## Method `AstraeaClient$run_betweenness_centrality`
+## ------------------------------------------------
+
+\dontrun{
+scores <- client$run_betweenness_centrality()
 }
 
 ## ------------------------------------------------
@@ -484,9 +557,18 @@ authentication token sent with every request.}
 \item \href{#method-AstraeaClient-semantic_walk}{\code{AstraeaClient$semantic_walk()}}
 \item \href{#method-AstraeaClient-extract_subgraph}{\code{AstraeaClient$extract_subgraph()}}
 \item \href{#method-AstraeaClient-graph_rag}{\code{AstraeaClient$graph_rag()}}
-\item \href{#method-AstraeaClient-anomaly_check}{\code{AstraeaClient$anomaly_check()}}
-\item \href{#method-AstraeaClient-anomaly_stats}{\code{AstraeaClient$anomaly_stats()}}
-\item \href{#method-AstraeaClient-anomaly_alerts}{\code{AstraeaClient$anomaly_alerts()}}
+\item \href{#method-AstraeaClient-dfs}{\code{AstraeaClient$dfs()}}
+\item \href{#method-AstraeaClient-dfs_at}{\code{AstraeaClient$dfs_at()}}
+\item \href{#method-AstraeaClient-find_by_label}{\code{AstraeaClient$find_by_label()}}
+\item \href{#method-AstraeaClient-find_edge_by_type}{\code{AstraeaClient$find_edge_by_type()}}
+\item \href{#method-AstraeaClient-delete_by_label}{\code{AstraeaClient$delete_by_label()}}
+\item \href{#method-AstraeaClient-get_subgraph}{\code{AstraeaClient$get_subgraph()}}
+\item \href{#method-AstraeaClient-graph_stats}{\code{AstraeaClient$graph_stats()}}
+\item \href{#method-AstraeaClient-run_pagerank}{\code{AstraeaClient$run_pagerank()}}
+\item \href{#method-AstraeaClient-run_louvain}{\code{AstraeaClient$run_louvain()}}
+\item \href{#method-AstraeaClient-run_connected_components}{\code{AstraeaClient$run_connected_components()}}
+\item \href{#method-AstraeaClient-run_degree_centrality}{\code{AstraeaClient$run_degree_centrality()}}
+\item \href{#method-AstraeaClient-run_betweenness_centrality}{\code{AstraeaClient$run_betweenness_centrality()}}
 \item \href{#method-AstraeaClient-create_nodes}{\code{AstraeaClient$create_nodes()}}
 \item \href{#method-AstraeaClient-create_edges}{\code{AstraeaClient$create_edges()}}
 \item \href{#method-AstraeaClient-delete_nodes}{\code{AstraeaClient$delete_nodes()}}
@@ -1225,7 +1307,9 @@ Default \code{10L}.}
 }
 \subsection{Returns}{
 A list of result entries, each containing at least
-\code{node_id} and \code{similarity}.
+\code{node_id} and \code{distance} (smaller is closer). A legacy
+\code{score} alias equal to \code{distance} is also present for
+backward compatibility with older clients.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -1326,7 +1410,7 @@ Default \code{10L}.}
 }
 \subsection{Returns}{
 A list of neighbor entries with \code{node_id} and
-\code{similarity} scores.
+\code{distance} (smaller is closer to the concept).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -1481,36 +1565,31 @@ answer <- client$graph_rag(
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AstraeaClient-anomaly_check"></a>}}
-\if{latex}{\out{\hypertarget{method-AstraeaClient-anomaly_check}{}}}
-\subsection{Method \code{anomaly_check()}}{
-Check the anomaly status of a node or edge.
-
-Uses AstraeaDB's "deja vu" anomaly detection algorithm to assess
-whether an entity's recent behavior is anomalous.
+\if{html}{\out{<a id="method-AstraeaClient-dfs"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-dfs}{}}}
+\subsection{Method \code{dfs()}}{
+Depth-first search starting from a node.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$anomaly_check(entity_id, is_node = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$dfs(start, max_depth = 3L)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{entity_id}}{Integer scalar. The node or edge ID to check.}
+\item{\code{start}}{Integer scalar. The starting node ID.}
 
-\item{\code{is_node}}{Logical scalar. If \code{TRUE} (default), check a
-node; if \code{FALSE}, check an edge.}
+\item{\code{max_depth}}{Integer scalar. Maximum traversal depth.
+Default \code{3L}.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A list with anomaly score information, or a message
-indicating no data is available yet.
+A list of node IDs (integers) in depth-first visitation order.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
-result <- client$anomaly_check(1L)
-result <- client$anomaly_check(5L, is_node = FALSE)
+visited <- client$dfs(1L, max_depth = 2L)
 }
 }
 \if{html}{\out{</div>}}
@@ -1519,35 +1598,34 @@ result <- client$anomaly_check(5L, is_node = FALSE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AstraeaClient-anomaly_stats"></a>}}
-\if{latex}{\out{\hypertarget{method-AstraeaClient-anomaly_stats}{}}}
-\subsection{Method \code{anomaly_stats()}}{
-Get detailed anomaly statistics for a node or edge.
-
-Returns more detailed information than \code{anomaly_check()},
-including historical anomaly scores and thresholds.
+\if{html}{\out{<a id="method-AstraeaClient-dfs_at"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-dfs_at}{}}}
+\subsection{Method \code{dfs_at()}}{
+Depth-first search as of a specific point in time.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$anomaly_stats(entity_id, is_node = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$dfs_at(start, max_depth = 3L, timestamp)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{entity_id}}{Integer scalar. The node or edge ID.}
+\item{\code{start}}{Integer scalar. The starting node ID.}
 
-\item{\code{is_node}}{Logical scalar. If \code{TRUE} (default), query a
-node; if \code{FALSE}, query an edge.}
+\item{\code{max_depth}}{Integer scalar. Maximum traversal depth.
+Default \code{3L}.}
+
+\item{\code{timestamp}}{Numeric scalar. Point in time (ms since epoch).}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A list with detailed anomaly statistics.
+A list of node IDs (integers) in depth-first visitation
+order as of \code{timestamp}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
-stats <- client$anomaly_stats(1L)
-stats <- client$anomaly_stats(5L, is_node = FALSE)
+visited <- client$dfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
 }
 }
 \if{html}{\out{</div>}}
@@ -1556,28 +1634,338 @@ stats <- client$anomaly_stats(5L, is_node = FALSE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-AstraeaClient-anomaly_alerts"></a>}}
-\if{latex}{\out{\hypertarget{method-AstraeaClient-anomaly_alerts}{}}}
-\subsection{Method \code{anomaly_alerts()}}{
-Get all active anomaly alerts.
-
-Returns a list of currently active anomaly alerts detected by the
-server's "deja vu" algorithm.
+\if{html}{\out{<a id="method-AstraeaClient-find_by_label"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-find_by_label}{}}}
+\subsection{Method \code{find_by_label()}}{
+Find all nodes carrying a given label.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$anomaly_alerts()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$find_by_label(label)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{label}}{Character scalar. The node label to match.}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Returns}{
-A list of alert entries. Each entry describes an anomalous
-entity and its anomaly score.
+A list of matching node IDs (integers).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
-alerts <- client$anomaly_alerts()
-for (a in alerts) {
-  cat(sprintf("Entity \%d: score \%.2f\n", a$id, a$score))
+ids <- client$find_by_label("Person")
 }
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-find_edge_by_type"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-find_edge_by_type}{}}}
+\subsection{Method \code{find_edge_by_type()}}{
+Find all edges of a given edge type.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$find_edge_by_type(edge_type)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{edge_type}}{Character scalar. The edge type to match.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list of entries, each a list with \code{edge_id},
+\code{source}, and \code{target} node IDs.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+edges <- client$find_edge_by_type("KNOWS")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-delete_by_label"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-delete_by_label}{}}}
+\subsection{Method \code{delete_by_label()}}{
+Delete every node carrying a given label, along with all its edges.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$delete_by_label(label)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{label}}{Character scalar. The node label to match.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Integer scalar: the number of nodes deleted.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+n_removed <- client$delete_by_label("Temporary")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-get_subgraph"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-get_subgraph}{}}}
+\subsection{Method \code{get_subgraph()}}{
+Retrieve the raw subgraph (nodes and edges) around a center node,
+suitable for visualization or client-side processing.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$get_subgraph(center, hops = 3L, max_nodes = 50L)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{center}}{Integer scalar. The center node ID.}
+
+\item{\code{hops}}{Integer scalar. Neighborhood radius in hops.
+Default \code{3L}.}
+
+\item{\code{max_nodes}}{Integer scalar. Maximum number of nodes to return.
+Default \code{50L}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list with \code{nodes} (each a list with \code{id},
+\code{labels}, \code{properties}, \code{has_embedding}) and
+\code{edges} (each a list with \code{id}, \code{source},
+\code{target}, \code{edge_type}, \code{properties}, \code{weight},
+\code{valid_from}, \code{valid_to}).
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+sg <- client$get_subgraph(1L, hops = 2L, max_nodes = 100L)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-graph_stats"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-graph_stats}{}}}
+\subsection{Method \code{graph_stats()}}{
+Retrieve graph-wide statistics: node and edge counts, per-label
+node counts, and vector-index information when available.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$graph_stats()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A named list of statistics, including \code{total_nodes},
+\code{total_edges}, and \code{labels} (a per-label node count).
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+stats <- client$graph_stats()
+stats$total_nodes
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-run_pagerank"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-run_pagerank}{}}}
+\subsection{Method \code{run_pagerank()}}{
+Run the PageRank algorithm over the whole graph or a node subset.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$run_pagerank(
+  nodes = NULL,
+  damping = 0.85,
+  max_iterations = 100L,
+  tolerance = 1e-06
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector. Restrict the computation to
+these node IDs. \code{NULL} (default) uses the whole graph.}
+
+\item{\code{damping}}{Numeric scalar. Damping factor. Default \code{0.85}.}
+
+\item{\code{max_iterations}}{Integer scalar. Maximum iterations.
+Default \code{100L}.}
+
+\item{\code{tolerance}}{Numeric scalar. Convergence tolerance.
+Default \code{1e-6}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A named list mapping node ID (a character key) to its
+PageRank score.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+scores <- client$run_pagerank()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-run_louvain"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-run_louvain}{}}}
+\subsection{Method \code{run_louvain()}}{
+Run Louvain community detection over the whole graph or a subset.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$run_louvain(nodes = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector. Restrict the computation to
+these node IDs. \code{NULL} (default) uses the whole graph.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list with \code{communities} (a named list mapping node ID
+to community index) and \code{num_communities}.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+res <- client$run_louvain()
+res$num_communities
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-run_connected_components"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-run_connected_components}{}}}
+\subsection{Method \code{run_connected_components()}}{
+Find connected components of the whole graph or a node subset.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$run_connected_components(nodes = NULL, strong = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector. Restrict the computation to
+these node IDs. \code{NULL} (default) uses the whole graph.}
+
+\item{\code{strong}}{Logical scalar. If \code{TRUE}, compute strongly
+connected components; otherwise weakly connected. Default
+\code{FALSE}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list with \code{components} (a list of integer vectors of
+node IDs) and \code{count}.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+cc <- client$run_connected_components()
+cc$count
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-run_degree_centrality"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-run_degree_centrality}{}}}
+\subsection{Method \code{run_degree_centrality()}}{
+Compute degree centrality for the whole graph or a node subset.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$run_degree_centrality(nodes = NULL, direction = "outgoing")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector. Restrict the computation to
+these node IDs. \code{NULL} (default) uses the whole graph.}
+
+\item{\code{direction}}{Character scalar. One of \code{"outgoing"}
+(default), \code{"incoming"}, or \code{"both"}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A named list mapping node ID (a character key) to its
+degree-centrality score.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+scores <- client$run_degree_centrality(direction = "both")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AstraeaClient-run_betweenness_centrality"></a>}}
+\if{latex}{\out{\hypertarget{method-AstraeaClient-run_betweenness_centrality}{}}}
+\subsection{Method \code{run_betweenness_centrality()}}{
+Compute betweenness centrality for the whole graph or a node subset.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AstraeaClient$run_betweenness_centrality(nodes = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector. Restrict the computation to
+these node IDs. \code{NULL} (default) uses the whole graph.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A named list mapping node ID (a character key) to its
+betweenness-centrality score.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+scores <- client$run_betweenness_centrality()
 }
 }
 \if{html}{\out{</div>}}

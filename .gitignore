@@ -8,6 +8,8 @@ doc
 *.o
 *.so
 *.dll
+.DS_Store
+CRAN-SUBMISSION
 claude.md
 development_plan.md
 pcap.md

@@ -121,9 +121,18 @@ should be used for queries.}
 \item \href{#method-UnifiedClient-semantic_walk}{\code{UnifiedClient$semantic_walk()}}
 \item \href{#method-UnifiedClient-extract_subgraph}{\code{UnifiedClient$extract_subgraph()}}
 \item \href{#method-UnifiedClient-graph_rag}{\code{UnifiedClient$graph_rag()}}
-\item \href{#method-UnifiedClient-anomaly_check}{\code{UnifiedClient$anomaly_check()}}
-\item \href{#method-UnifiedClient-anomaly_stats}{\code{UnifiedClient$anomaly_stats()}}
-\item \href{#method-UnifiedClient-anomaly_alerts}{\code{UnifiedClient$anomaly_alerts()}}
+\item \href{#method-UnifiedClient-dfs}{\code{UnifiedClient$dfs()}}
+\item \href{#method-UnifiedClient-dfs_at}{\code{UnifiedClient$dfs_at()}}
+\item \href{#method-UnifiedClient-find_by_label}{\code{UnifiedClient$find_by_label()}}
+\item \href{#method-UnifiedClient-find_edge_by_type}{\code{UnifiedClient$find_edge_by_type()}}
+\item \href{#method-UnifiedClient-delete_by_label}{\code{UnifiedClient$delete_by_label()}}
+\item \href{#method-UnifiedClient-get_subgraph}{\code{UnifiedClient$get_subgraph()}}
+\item \href{#method-UnifiedClient-graph_stats}{\code{UnifiedClient$graph_stats()}}
+\item \href{#method-UnifiedClient-run_pagerank}{\code{UnifiedClient$run_pagerank()}}
+\item \href{#method-UnifiedClient-run_louvain}{\code{UnifiedClient$run_louvain()}}
+\item \href{#method-UnifiedClient-run_connected_components}{\code{UnifiedClient$run_connected_components()}}
+\item \href{#method-UnifiedClient-run_degree_centrality}{\code{UnifiedClient$run_degree_centrality()}}
+\item \href{#method-UnifiedClient-run_betweenness_centrality}{\code{UnifiedClient$run_betweenness_centrality()}}
 \item \href{#method-UnifiedClient-create_nodes}{\code{UnifiedClient$create_nodes()}}
 \item \href{#method-UnifiedClient-create_edges}{\code{UnifiedClient$create_edges()}}
 \item \href{#method-UnifiedClient-delete_nodes}{\code{UnifiedClient$delete_nodes()}}
@@ -750,62 +759,266 @@ A list with the LLM-generated answer and context.
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-UnifiedClient-anomaly_check"></a>}}
-\if{latex}{\out{\hypertarget{method-UnifiedClient-anomaly_check}{}}}
-\subsection{Method \code{anomaly_check()}}{
-Check anomaly status of an entity. Delegates to the JSON/TCP client.
+\if{html}{\out{<a id="method-UnifiedClient-dfs"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-dfs}{}}}
+\subsection{Method \code{dfs()}}{
+Depth-first search from a node. Delegates to the JSON/TCP client.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$anomaly_check(entity_id, is_node = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$dfs(start, max_depth = 3L)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{entity_id}}{Integer. The node or edge ID.}
+\item{\code{start}}{Integer. The starting node ID.}
 
-\item{\code{is_node}}{Logical. Check a node (\code{TRUE}) or edge
-(\code{FALSE}). Defaults to \code{TRUE}.}
+\item{\code{max_depth}}{Integer. Maximum traversal depth. Default \code{3L}.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A list with anomaly score information.
+A list of node IDs in depth-first visitation order.
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-UnifiedClient-anomaly_stats"></a>}}
-\if{latex}{\out{\hypertarget{method-UnifiedClient-anomaly_stats}{}}}
-\subsection{Method \code{anomaly_stats()}}{
-Get detailed anomaly statistics. Delegates to the JSON/TCP client.
+\if{html}{\out{<a id="method-UnifiedClient-dfs_at"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-dfs_at}{}}}
+\subsection{Method \code{dfs_at()}}{
+Depth-first search as of a point in time. Delegates to the JSON/TCP
+client.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$anomaly_stats(entity_id, is_node = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$dfs_at(start, max_depth = 3L, timestamp)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{entity_id}}{Integer. The node or edge ID.}
+\item{\code{start}}{Integer. The starting node ID.}
 
-\item{\code{is_node}}{Logical. Query a node (\code{TRUE}) or edge
-(\code{FALSE}). Defaults to \code{TRUE}.}
+\item{\code{max_depth}}{Integer. Maximum traversal depth. Default \code{3L}.}
+
+\item{\code{timestamp}}{Numeric. Point in time (ms since epoch).}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A list with detailed anomaly statistics.
+A list of node IDs in depth-first visitation order.
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-UnifiedClient-anomaly_alerts"></a>}}
-\if{latex}{\out{\hypertarget{method-UnifiedClient-anomaly_alerts}{}}}
-\subsection{Method \code{anomaly_alerts()}}{
-Get all active anomaly alerts. Delegates to the JSON/TCP client.
+\if{html}{\out{<a id="method-UnifiedClient-find_by_label"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-find_by_label}{}}}
+\subsection{Method \code{find_by_label()}}{
+Find nodes by label. Delegates to the JSON/TCP client.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$anomaly_alerts()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$find_by_label(label)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{label}}{Character. The node label to match.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list of matching node IDs.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-find_edge_by_type"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-find_edge_by_type}{}}}
+\subsection{Method \code{find_edge_by_type()}}{
+Find edges by edge type. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$find_edge_by_type(edge_type)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{edge_type}}{Character. The edge type to match.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list of entries with \code{edge_id}, \code{source},
+\code{target}.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-delete_by_label"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-delete_by_label}{}}}
+\subsection{Method \code{delete_by_label()}}{
+Delete all nodes with a label. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$delete_by_label(label)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{label}}{Character. The node label to match.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Integer scalar: the number of nodes deleted.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-get_subgraph"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-get_subgraph}{}}}
+\subsection{Method \code{get_subgraph()}}{
+Retrieve the raw subgraph around a node. Delegates to the JSON/TCP
+client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$get_subgraph(center, hops = 3L, max_nodes = 50L)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{center}}{Integer. The center node ID.}
+
+\item{\code{hops}}{Integer. Neighborhood radius. Default \code{3L}.}
+
+\item{\code{max_nodes}}{Integer. Maximum nodes to return. Default \code{50L}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list with \code{nodes} and \code{edges}.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-graph_stats"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-graph_stats}{}}}
+\subsection{Method \code{graph_stats()}}{
+Retrieve graph-wide statistics. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$graph_stats()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
-A list of alert entries.
+A named list of statistics.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-run_pagerank"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-run_pagerank}{}}}
+\subsection{Method \code{run_pagerank()}}{
+Run PageRank. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$run_pagerank(
+  nodes = NULL,
+  damping = 0.85,
+  max_iterations = 100L,
+  tolerance = 1e-06
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector restricting the computation.}
+
+\item{\code{damping}}{Numeric. Damping factor. Default \code{0.85}.}
+
+\item{\code{max_iterations}}{Integer. Maximum iterations. Default \code{100L}.}
+
+\item{\code{tolerance}}{Numeric. Convergence tolerance. Default \code{1e-6}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A named list mapping node ID to PageRank score.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-run_louvain"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-run_louvain}{}}}
+\subsection{Method \code{run_louvain()}}{
+Run Louvain community detection. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$run_louvain(nodes = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector restricting the computation.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list with \code{communities} and \code{num_communities}.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-run_connected_components"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-run_connected_components}{}}}
+\subsection{Method \code{run_connected_components()}}{
+Find connected components. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$run_connected_components(nodes = NULL, strong = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector restricting the computation.}
+
+\item{\code{strong}}{Logical. Strongly (\code{TRUE}) or weakly
+(\code{FALSE}, default) connected.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A list with \code{components} and \code{count}.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-run_degree_centrality"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-run_degree_centrality}{}}}
+\subsection{Method \code{run_degree_centrality()}}{
+Compute degree centrality. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$run_degree_centrality(nodes = NULL, direction = "outgoing")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector restricting the computation.}
+
+\item{\code{direction}}{Character. \code{"outgoing"} (default),
+\code{"incoming"}, or \code{"both"}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A named list mapping node ID to degree-centrality score.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-UnifiedClient-run_betweenness_centrality"></a>}}
+\if{latex}{\out{\hypertarget{method-UnifiedClient-run_betweenness_centrality}{}}}
+\subsection{Method \code{run_betweenness_centrality()}}{
+Compute betweenness centrality. Delegates to the JSON/TCP client.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{UnifiedClient$run_betweenness_centrality(nodes = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{nodes}}{Optional integer vector restricting the computation.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A named list mapping node ID to betweenness-centrality score.
 }
 }
 \if{html}{\out{<hr>}}

@@ -62,7 +62,11 @@ astraea_arrow_connect <- function(uri = "grpc://localhost:7689") {
 #' @return Logical. \code{TRUE} if server is reachable, \code{FALSE} otherwise.
 #' @export
 #' @examples
-#' astraea_server_available()
+#' \dontrun{
+#' if (astraea_server_available()) {
+#'   client <- astraea_connect()
+#' }
+#' }
 astraea_server_available <- function(host = "127.0.0.1", port = 7687L,
                                      timeout = 2) {
   tryCatch({

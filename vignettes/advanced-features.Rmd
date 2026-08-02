@@ -78,16 +78,17 @@ results <- client$vector_search(
 )
 
 for (r in results) {
-  cat(sprintf("Node %d -- similarity: %.4f\n", r$node_id, r$similarity))
+  cat(sprintf("Node %d -- distance: %.4f\n", r$node_id, r$distance))
 }
-#> Node 1 -- similarity: 0.9952
-#> Node 4 -- similarity: 0.9871
-#> Node 2 -- similarity: 0.4123
+#> Node 1 -- distance: 0.0048
+#> Node 4 -- distance: 0.0129
+#> Node 2 -- distance: 0.5877
 ```
 
-Each result entry contains at least `node_id` and `similarity`. The
-similarity metric is determined by the server configuration (typically cosine
-similarity).
+Each result entry contains at least `node_id` and `distance` (smaller is
+closer). A legacy `score` field equal to `distance` is also returned for
+backward compatibility. The distance metric is determined by the server
+configuration (typically cosine distance).
 
 ## Hybrid Search
 
@@ -146,7 +147,7 @@ ranked <- client$semantic_neighbors(
 )
 
 for (r in ranked) {
-  cat(sprintf("Neighbor %d -- similarity: %.4f\n", r$node_id, r$similarity))
+  cat(sprintf("Neighbor %d -- distance: %.4f\n", r$node_id, r$distance))
 }
 ```
 
@@ -340,49 +341,73 @@ answer <- client$graph_rag(
 cat(answer$answer, "\n")
 ```
 
-## Anomaly Detection
+## Graph Algorithms
 
-AstraeaDB includes a built-in anomaly detection system based on the "deja vu"
-algorithm. It monitors entity behavior over time and flags nodes or edges
-whose recent activity deviates significantly from their historical baseline.
+AstraeaDB computes classic graph-analytics algorithms server-side and returns
+the results over the wire. Pass `nodes =` to any of them to restrict the
+computation to a subset of node IDs; the default is the whole graph.
 
-### Checking an Entity
+### Centrality and Ranking
 
-Use `anomaly_check()` to get the anomaly status of a specific node or edge:
+```{r algorithms-centrality}
+# PageRank
+scores <- client$run_pagerank(damping = 0.85, max_iterations = 100L)
 
-```{r anomaly-check}
-# Check anomaly status of a node
-result <- client$anomaly_check(alice)
-
-# Check an edge instead
-edge_result <- client$anomaly_check(5L, is_node = FALSE)
+# Degree and betweenness centrality
+deg <- client$run_degree_centrality(direction = "both")
+btw <- client$run_betweenness_centrality()
 ```
 
-If the entity has not been active long enough for anomaly detection to have
-data, the server returns a message indicating no data is available yet.
+Each returns a named list mapping the node ID (as a character key) to its
+score.
 
-### Detailed Statistics
+### Community Detection and Components
 
-`anomaly_stats()` returns more detailed information, including historical
-scores and thresholds:
-```{r anomaly-stats}
-stats <- client$anomaly_stats(alice)
+```{r algorithms-community}
+# Louvain community detection
+louvain <- client$run_louvain()
+cat("Communities found:", louvain$num_communities, "\n")
+
+# Connected components (weakly connected by default; strong = TRUE for SCCs)
+cc <- client$run_connected_components(strong = FALSE)
+cat("Number of components:", cc$count, "\n")
 ```
 
-### Active Alerts
+## Traversal, Lookups, and Statistics
 
-`anomaly_alerts()` returns all currently active anomaly alerts across the
-entire graph:
+### Depth-First Search
 
-```{r anomaly-alerts}
-alerts <- client$anomaly_alerts()
-for (a in alerts) {
-  cat(sprintf("Entity %d: anomaly detected\n", a$id))
-}
+```{r traversal-dfs}
+# Depth-first traversal (a companion to bfs())
+visited <- client$dfs(alice, max_depth = 3L)
+
+# ...as of a point in time
+visited_past <- client$dfs_at(alice, max_depth = 3L, timestamp = 1672531200000)
 ```
 
-Anomaly detection is passive -- the server continuously monitors activity in
-the background. No explicit training step is required.
+### Finding and Bulk-Deleting by Label
+
+```{r lookups}
+# All node IDs carrying a label
+people <- client$find_by_label("Person")
+
+# All edges of a given type, each as {edge_id, source, target}
+knows_edges <- client$find_edge_by_type("KNOWS")
+
+# Bulk-delete every node with a label (and its edges); returns the count
+removed <- client$delete_by_label("Temporary")
+```
+
+### Subgraph Export and Statistics
+
+```{r subgraph-stats}
+# Raw subgraph (nodes + edges) around a center node, for visualization
+sg <- client$get_subgraph(alice, hops = 2L, max_nodes = 100L)
+
+# Graph-wide statistics
+stats <- client$graph_stats()
+cat("Nodes:", stats$total_nodes, " Edges:", stats$total_edges, "\n")
+```
 
 ## Arrow Flight Transport
 
@@ -587,7 +612,7 @@ client$create_edge(ml,  kg,  "RELATED_TO", weight = 0.7,
 cat("== Vector Search ==\n")
 vs <- client$vector_search(c(0.15, 0.85, 0.8, 0.65), k = 2L)
 for (r in vs) {
-  cat(sprintf("  Node %d (sim %.4f)\n", r$node_id, r$similarity))
+  cat(sprintf("  Node %d (dist %.4f)\n", r$node_id, r$distance))
 }
 
 # --- Hybrid search ---
@@ -632,8 +657,8 @@ This vignette demonstrated the advanced features of the AstraeaDB R package:
 - **Temporal queries** let you explore the graph as it existed at any point
   in time.
 - **GraphRAG** extracts subgraph context for LLM-powered question answering.
-- **Anomaly detection** monitors entity behavior and flags deviations using
-  the "deja vu" algorithm.
+- **Graph algorithms** compute PageRank, Louvain communities, connected
+  components, and degree/betweenness centrality server-side.
 - **Arrow Flight** enables high-performance columnar data transfer for
   analytical workloads.
 - **Authentication** secures access with token-based RBAC.

@@ -3,11 +3,13 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-An R client for [AstraeaDB](https://github.com/astraeadb/astraeadb), a
-cloud-native, AI-first graph database written in Rust. AstraeaDB provides
-node and edge CRUD operations, graph traversals, temporal queries, vector
-similarity search, hybrid graph-vector search, GQL query execution, and
-GraphRAG (subgraph extraction with LLM integration).
+An R client for [AstraeaDB](https://github.com/AstraeaDB/AstraeaDB-Official), a
+graph database with vector search written in Rust. AstraeaDB provides node and
+edge CRUD operations, label and edge-type lookups, graph traversals (BFS, DFS,
+shortest path), temporal queries, graph algorithms (PageRank, Louvain,
+connected components, centrality), vector similarity search, hybrid
+graph-vector search, GQL query execution, and GraphRAG (subgraph extraction
+with LLM integration).
 
 ## Installation
 
@@ -15,13 +17,13 @@ Install the development version from GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("astraeadb/R-AstraeaDB")
+remotes::install_github("AstraeaDB/R-AstraeaDB")
 ```
 
 ## Prerequisites
 
 A running AstraeaDB server is required. See the
-[AstraeaDB documentation](https://github.com/astraeadb/astraeadb) for
+[AstraeaDB documentation](https://github.com/AstraeaDB/AstraeaDB-Official) for
 installation and startup instructions.
 
 ## Quick start
@@ -56,8 +58,9 @@ client$disconnect()
 ### Core graph operations
 
 - **Node and edge CRUD** -- create, read, update, and delete nodes and edges
-- **Graph traversals** -- BFS, shortest path (weighted and unweighted),
+- **Graph traversals** -- BFS, DFS, shortest path (weighted and unweighted),
   neighbor queries with direction and edge-type filtering
+- **Lookups** -- find nodes by label, find edges by type, bulk-delete by label
 - **Batch operations** -- bulk create and delete for nodes and edges
 - **Data frame integration** -- import nodes/edges from data frames and export
   query results back to data frames
@@ -77,10 +80,13 @@ client$disconnect()
 - **Time-travel** -- query the graph as it existed at any point in time using
   edge validity windows (`valid_from` / `valid_to`)
 
-### Anomaly detection
+### Graph algorithms
 
-- **Deja vu algorithm** -- check anomaly status, retrieve statistics, and list
-  active alerts
+- **PageRank, Louvain, connected components, degree and betweenness
+  centrality** -- classic analytics computed server-side over the whole graph
+  or a node subset
+- **Graph statistics and subgraph export** -- node/edge counts, label
+  distribution, and raw subgraph retrieval for visualization
 
 ### Transport options
 

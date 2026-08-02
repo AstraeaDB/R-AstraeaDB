@@ -360,22 +360,31 @@ test_that("export_nodes_df works", {
 })
 
 # ============================================================================
-# Anomaly Detection (unit tests)
+# New commands: not-connected guards (unit tests)
 # ============================================================================
 
-test_that("anomaly_check errors when not connected", {
+test_that("traversal and lookup methods error when not connected", {
   client <- AstraeaClient$new()
-  expect_error(client$anomaly_check(1L), "Not connected")
+  expect_error(client$dfs(1L), "Not connected")
+  expect_error(client$dfs_at(1L, timestamp = 1), "Not connected")
+  expect_error(client$find_by_label("Person"), "Not connected")
+  expect_error(client$find_edge_by_type("KNOWS"), "Not connected")
+  expect_error(client$delete_by_label("Tmp"), "Not connected")
 })
 
-test_that("anomaly_stats errors when not connected", {
+test_that("subgraph and stats methods error when not connected", {
   client <- AstraeaClient$new()
-  expect_error(client$anomaly_stats(1L), "Not connected")
+  expect_error(client$get_subgraph(1L), "Not connected")
+  expect_error(client$graph_stats(), "Not connected")
 })
 
-test_that("anomaly_alerts errors when not connected", {
+test_that("graph-algorithm methods error when not connected", {
   client <- AstraeaClient$new()
-  expect_error(client$anomaly_alerts(), "Not connected")
+  expect_error(client$run_pagerank(), "Not connected")
+  expect_error(client$run_louvain(), "Not connected")
+  expect_error(client$run_connected_components(), "Not connected")
+  expect_error(client$run_degree_centrality(), "Not connected")
+  expect_error(client$run_betweenness_centrality(), "Not connected")
 })
 
 # ============================================================================
@@ -408,78 +417,64 @@ test_that("nodes_to_dataframe errors when not connected", {
 })
 
 # ============================================================================
-# Anomaly Detection (integration tests)
+# New commands (integration tests)
 # ============================================================================
 
-test_that("anomaly_check returns a result or reports not enabled", {
+test_that("dfs, find_by_label, and find_edge_by_type work on a live server", {
   skip_if_no_server()
 
   client <- AstraeaClient$new()
   withr::defer(client$disconnect())
   client$connect()
 
-  tag <- paste0("test_", format(Sys.time(), "%Y%m%d%H%M%OS6"))
-  node_id <- client$create_node(
-    labels = c("TestAnomaly"),
-    properties = list(name = tag)
-  )
-  withr::defer(tryCatch(client$delete_node(node_id), error = function(e) NULL))
+  tag <- paste0("RParity_", format(Sys.time(), "%Y%m%d%H%M%OS6"))
+  a <- client$create_node(labels = c(tag), properties = list(name = "a"))
+  b <- client$create_node(labels = c(tag), properties = list(name = "b"))
+  client$create_edge(a, b, edge_type = "RPARITY_LINK")
+  withr::defer(tryCatch(client$delete_by_label(tag), error = function(e) NULL))
 
-  result <- tryCatch(
-    client$anomaly_check(node_id),
-    error = function(e) {
-      if (grepl("not enabled", conditionMessage(e), fixed = TRUE)) {
-        skip("Anomaly detection not enabled on server")
-      }
-      stop(e)
-    }
-  )
-  expect_type(result, "list")
+  visited <- client$dfs(a, max_depth = 2L)
+  expect_type(visited, "list")
+
+  found <- client$find_by_label(tag)
+  expect_true(length(found) >= 2L)
+
+  edges <- client$find_edge_by_type("RPARITY_LINK")
+  expect_type(edges, "list")
 })
 
-test_that("anomaly_stats returns a result or reports not enabled", {
+test_that("graph_stats and algorithms return structured results", {
   skip_if_no_server()
 
   client <- AstraeaClient$new()
   withr::defer(client$disconnect())
   client$connect()
 
-  tag <- paste0("test_", format(Sys.time(), "%Y%m%d%H%M%OS6"))
-  node_id <- client$create_node(
-    labels = c("TestAnomaly"),
-    properties = list(name = tag)
-  )
-  withr::defer(tryCatch(client$delete_node(node_id), error = function(e) NULL))
+  stats <- client$graph_stats()
+  expect_type(stats, "list")
+  expect_true("total_nodes" %in% names(stats))
 
-  result <- tryCatch(
-    client$anomaly_stats(node_id),
-    error = function(e) {
-      if (grepl("not enabled", conditionMessage(e), fixed = TRUE)) {
-        skip("Anomaly detection not enabled on server")
-      }
-      stop(e)
-    }
-  )
-  expect_type(result, "list")
+  pr <- client$run_pagerank(max_iterations = 20L)
+  expect_type(pr, "list")
+
+  cc <- client$run_connected_components()
+  expect_true("count" %in% names(cc))
 })
 
-test_that("anomaly_alerts returns a list or reports not enabled", {
+test_that("delete_by_label removes every tagged node", {
   skip_if_no_server()
 
   client <- AstraeaClient$new()
   withr::defer(client$disconnect())
   client$connect()
 
-  result <- tryCatch(
-    client$anomaly_alerts(),
-    error = function(e) {
-      if (grepl("not enabled", conditionMessage(e), fixed = TRUE)) {
-        skip("Anomaly detection not enabled on server")
-      }
-      stop(e)
-    }
-  )
-  expect_type(result, "list")
+  tag <- paste0("RDelete_", format(Sys.time(), "%Y%m%d%H%M%OS6"))
+  client$create_node(labels = c(tag), properties = list(x = 1))
+  client$create_node(labels = c(tag), properties = list(x = 2))
+
+  n <- client$delete_by_label(tag)
+  expect_true(n >= 2L)
+  expect_equal(length(client$find_by_label(tag)), 0L)
 })
 
 # ============================================================================

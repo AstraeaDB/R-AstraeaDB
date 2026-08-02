@@ -444,38 +444,146 @@ UnifiedClient <- R6::R6Class(
                                  hops, max_nodes, format)
     },
 
-    # -- Anomaly Detection -------------------------------------------------
+    # -- Depth-First Search ------------------------------------------------
 
     #' @description
-    #' Check anomaly status of an entity. Delegates to the JSON/TCP client.
+    #' Depth-first search from a node. Delegates to the JSON/TCP client.
     #'
-    #' @param entity_id Integer. The node or edge ID.
-    #' @param is_node Logical. Check a node (\code{TRUE}) or edge
-    #'   (\code{FALSE}). Defaults to \code{TRUE}.
+    #' @param start Integer. The starting node ID.
+    #' @param max_depth Integer. Maximum traversal depth. Default \code{3L}.
     #'
-    #' @return A list with anomaly score information.
-    anomaly_check = function(entity_id, is_node = TRUE) {
-      self$json_client$anomaly_check(entity_id, is_node)
+    #' @return A list of node IDs in depth-first visitation order.
+    dfs = function(start, max_depth = 3L) {
+      self$json_client$dfs(start, max_depth)
     },
 
     #' @description
-    #' Get detailed anomaly statistics. Delegates to the JSON/TCP client.
+    #' Depth-first search as of a point in time. Delegates to the JSON/TCP
+    #' client.
     #'
-    #' @param entity_id Integer. The node or edge ID.
-    #' @param is_node Logical. Query a node (\code{TRUE}) or edge
-    #'   (\code{FALSE}). Defaults to \code{TRUE}.
+    #' @param start Integer. The starting node ID.
+    #' @param max_depth Integer. Maximum traversal depth. Default \code{3L}.
+    #' @param timestamp Numeric. Point in time (ms since epoch).
     #'
-    #' @return A list with detailed anomaly statistics.
-    anomaly_stats = function(entity_id, is_node = TRUE) {
-      self$json_client$anomaly_stats(entity_id, is_node)
+    #' @return A list of node IDs in depth-first visitation order.
+    dfs_at = function(start, max_depth = 3L, timestamp) {
+      self$json_client$dfs_at(start, max_depth, timestamp)
+    },
+
+    # -- Label and Edge-Type Lookups ---------------------------------------
+
+    #' @description
+    #' Find nodes by label. Delegates to the JSON/TCP client.
+    #'
+    #' @param label Character. The node label to match.
+    #'
+    #' @return A list of matching node IDs.
+    find_by_label = function(label) {
+      self$json_client$find_by_label(label)
     },
 
     #' @description
-    #' Get all active anomaly alerts. Delegates to the JSON/TCP client.
+    #' Find edges by edge type. Delegates to the JSON/TCP client.
     #'
-    #' @return A list of alert entries.
-    anomaly_alerts = function() {
-      self$json_client$anomaly_alerts()
+    #' @param edge_type Character. The edge type to match.
+    #'
+    #' @return A list of entries with \code{edge_id}, \code{source},
+    #'   \code{target}.
+    find_edge_by_type = function(edge_type) {
+      self$json_client$find_edge_by_type(edge_type)
+    },
+
+    #' @description
+    #' Delete all nodes with a label. Delegates to the JSON/TCP client.
+    #'
+    #' @param label Character. The node label to match.
+    #'
+    #' @return Integer scalar: the number of nodes deleted.
+    delete_by_label = function(label) {
+      self$json_client$delete_by_label(label)
+    },
+
+    # -- Subgraph and Statistics -------------------------------------------
+
+    #' @description
+    #' Retrieve the raw subgraph around a node. Delegates to the JSON/TCP
+    #' client.
+    #'
+    #' @param center Integer. The center node ID.
+    #' @param hops Integer. Neighborhood radius. Default \code{3L}.
+    #' @param max_nodes Integer. Maximum nodes to return. Default \code{50L}.
+    #'
+    #' @return A list with \code{nodes} and \code{edges}.
+    get_subgraph = function(center, hops = 3L, max_nodes = 50L) {
+      self$json_client$get_subgraph(center, hops, max_nodes)
+    },
+
+    #' @description
+    #' Retrieve graph-wide statistics. Delegates to the JSON/TCP client.
+    #'
+    #' @return A named list of statistics.
+    graph_stats = function() {
+      self$json_client$graph_stats()
+    },
+
+    # -- Graph Algorithms --------------------------------------------------
+
+    #' @description
+    #' Run PageRank. Delegates to the JSON/TCP client.
+    #'
+    #' @param nodes Optional integer vector restricting the computation.
+    #' @param damping Numeric. Damping factor. Default \code{0.85}.
+    #' @param max_iterations Integer. Maximum iterations. Default \code{100L}.
+    #' @param tolerance Numeric. Convergence tolerance. Default \code{1e-6}.
+    #'
+    #' @return A named list mapping node ID to PageRank score.
+    run_pagerank = function(nodes = NULL, damping = 0.85,
+                            max_iterations = 100L, tolerance = 1e-6) {
+      self$json_client$run_pagerank(nodes, damping, max_iterations, tolerance)
+    },
+
+    #' @description
+    #' Run Louvain community detection. Delegates to the JSON/TCP client.
+    #'
+    #' @param nodes Optional integer vector restricting the computation.
+    #'
+    #' @return A list with \code{communities} and \code{num_communities}.
+    run_louvain = function(nodes = NULL) {
+      self$json_client$run_louvain(nodes)
+    },
+
+    #' @description
+    #' Find connected components. Delegates to the JSON/TCP client.
+    #'
+    #' @param nodes Optional integer vector restricting the computation.
+    #' @param strong Logical. Strongly (\code{TRUE}) or weakly
+    #'   (\code{FALSE}, default) connected.
+    #'
+    #' @return A list with \code{components} and \code{count}.
+    run_connected_components = function(nodes = NULL, strong = FALSE) {
+      self$json_client$run_connected_components(nodes, strong)
+    },
+
+    #' @description
+    #' Compute degree centrality. Delegates to the JSON/TCP client.
+    #'
+    #' @param nodes Optional integer vector restricting the computation.
+    #' @param direction Character. \code{"outgoing"} (default),
+    #'   \code{"incoming"}, or \code{"both"}.
+    #'
+    #' @return A named list mapping node ID to degree-centrality score.
+    run_degree_centrality = function(nodes = NULL, direction = "outgoing") {
+      self$json_client$run_degree_centrality(nodes, direction)
+    },
+
+    #' @description
+    #' Compute betweenness centrality. Delegates to the JSON/TCP client.
+    #'
+    #' @param nodes Optional integer vector restricting the computation.
+    #'
+    #' @return A named list mapping node ID to betweenness-centrality score.
+    run_betweenness_centrality = function(nodes = NULL) {
+      self$json_client$run_betweenness_centrality(nodes)
     },
 
     # -- Batch Operations --------------------------------------------------

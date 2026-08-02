@@ -22,5 +22,9 @@ Useful for conditionally running examples and tests that require a live
 server.
 }
 \examples{
-astraea_server_available()
+\dontrun{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+}
+}
 }

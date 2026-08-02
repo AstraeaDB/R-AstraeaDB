@@ -10,8 +10,14 @@ database.
 * checking CRAN incoming feasibility ... NOTE
   Maintainer: 'James Harris <jimeharrisjr@gmail.com>'
   New submission
+  Possibly misspelled words in DESCRIPTION:
+    betweenness (12:32)
+    lookups (9:48)
 
-  This is the standard note for a first submission.
+  This is the standard note for a first submission. The two flagged words
+  are spelled correctly: "betweenness" is the standard graph-theory term
+  (betweenness centrality) and "lookups" is the plural of "lookup". Neither
+  is in the aspell dictionary used by the incoming check.
 
 Local `R CMD check --as-cran` on macOS additionally reports two notes that are
 specific to the check environment and do not reflect package problems:

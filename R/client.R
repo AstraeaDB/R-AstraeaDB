@@ -40,38 +40,40 @@
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' # Connect to a local AstraeaDB server
-#' client <- AstraeaClient$new()
-#' client$connect()
+#' \donttest{
+#' if (astraea_server_available()) {
+#'   # Connect to a local AstraeaDB server
+#'   client <- AstraeaClient$new()
+#'   client$connect()
 #'
-#' # Health check
-#' client$ping()
+#'   # Health check
+#'   client$ping()
 #'
-#' # Create nodes
-#' alice_id <- client$create_node(
-#'   labels = c("Person"),
-#'   properties = list(name = "Alice", age = 30)
-#' )
-#' bob_id <- client$create_node(
-#'   labels = c("Person"),
-#'   properties = list(name = "Bob", age = 25)
-#' )
+#'   # Create nodes
+#'   alice_id <- client$create_node(
+#'     labels = c("Person"),
+#'     properties = list(name = "Alice", age = 30)
+#'   )
+#'   bob_id <- client$create_node(
+#'     labels = c("Person"),
+#'     properties = list(name = "Bob", age = 25)
+#'   )
 #'
-#' # Create an edge
-#' edge_id <- client$create_edge(
-#'   source = alice_id,
-#'   target = bob_id,
-#'   edge_type = "KNOWS",
-#'   properties = list(since = 2020)
-#' )
+#'   # Create an edge
+#'   edge_id <- client$create_edge(
+#'     source = alice_id,
+#'     target = bob_id,
+#'     edge_type = "KNOWS",
+#'     properties = list(since = 2020)
+#'   )
 #'
-#' # Traverse the graph
-#' client$neighbors(alice_id, direction = "outgoing")
-#' client$bfs(alice_id, max_depth = 2L)
+#'   # Traverse the graph
+#'   client$neighbors(alice_id, direction = "outgoing")
+#'   client$bfs(alice_id, max_depth = 2L)
 #'
-#' # Clean up
-#' client$disconnect()
+#'   # Clean up
+#'   client$disconnect()
+#' }
 #' }
 AstraeaClient <- R6::R6Class(
   "AstraeaClient",
@@ -105,11 +107,9 @@ AstraeaClient <- R6::R6Class(
     #' @return An \code{AstraeaClient} object (invisibly).
     #'
     #' @examples
-    #' \dontrun{
     #' client <- AstraeaClient$new()
     #' client <- AstraeaClient$new(host = "db.example.com", port = 7688L)
     #' client <- AstraeaClient$new(auth_token = "my-secret-token")
-    #' }
     initialize = function(host = "127.0.0.1", port = 7687L, auth_token = NULL) {
       stopifnot(
         is.character(host), length(host) == 1L, nchar(host) > 0L
@@ -137,9 +137,11 @@ AstraeaClient <- R6::R6Class(
     #' @return The client object (invisibly), for method chaining.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- AstraeaClient$new()
-    #' client$connect()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- AstraeaClient$new()
+    #'   client$connect()
+    #' }
     #' }
     connect = function() {
       if (!is.null(self$con)) {
@@ -162,8 +164,12 @@ AstraeaClient <- R6::R6Class(
     #' @return The client object (invisibly).
     #'
     #' @examples
-    #' \dontrun{
-    #' client$disconnect()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   client$disconnect()
+    #'   client$disconnect()
+    #' }
     #' }
     disconnect = function() {
       if (!is.null(self$con)) {
@@ -180,8 +186,12 @@ AstraeaClient <- R6::R6Class(
     #'   otherwise.
     #'
     #' @examples
-    #' \dontrun{
-    #' client$is_connected()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   client$is_connected()
+    #'   client$disconnect()
+    #' }
     #' }
     is_connected = function() {
       !is.null(self$con)
@@ -213,9 +223,13 @@ AstraeaClient <- R6::R6Class(
     #'   \code{pong}).
     #'
     #' @examples
-    #' \dontrun{
-    #' info <- client$ping()
-    #' message(info$version)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   info <- client$ping()
+    #'   message(info$version)
+    #'   client$disconnect()
+    #' }
     #' }
     ping = function() {
       private$assert_connected()
@@ -236,12 +250,17 @@ AstraeaClient <- R6::R6Class(
     #' @return Integer scalar: the ID of the newly created node.
     #'
     #' @examples
-    #' \dontrun{
-    #' nid <- client$create_node(
-    #'   labels = c("Person"),
-    #'   properties = list(name = "Alice", age = 30),
-    #'   embedding = c(0.1, 0.9, 0.3)
-    #' )
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   dim <- client$ping()$vector_dim
+    #'   nid <- client$create_node(
+    #'     labels = c("Person"),
+    #'     properties = list(name = "Alice", age = 30),
+    #'     embedding = rep(0.1, dim)
+    #'   )
+    #'   client$disconnect()
+    #' }
     #' }
     create_node = function(labels, properties, embedding = NULL) {
       private$assert_connected()
@@ -268,10 +287,16 @@ AstraeaClient <- R6::R6Class(
     #'   \code{properties} (named list).
     #'
     #' @examples
-    #' \dontrun{
-    #' node <- client$get_node(1L)
-    #' node$labels
-    #' node$properties$name
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   node <- client$get_node(a)
+    #'   node$labels
+    #'   node$properties$name
+    #'   client$disconnect()
+    #' }
     #' }
     get_node = function(node_id) {
       private$assert_connected()
@@ -289,8 +314,14 @@ AstraeaClient <- R6::R6Class(
     #' @return The server response data (invisibly).
     #'
     #' @examples
-    #' \dontrun{
-    #' client$update_node(1L, list(city = "San Francisco"))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   client$update_node(a, list(city = "San Francisco"))
+    #'   client$disconnect()
+    #' }
     #' }
     update_node = function(node_id, properties) {
       private$assert_connected()
@@ -311,8 +342,14 @@ AstraeaClient <- R6::R6Class(
     #' @return The server response data (invisibly).
     #'
     #' @examples
-    #' \dontrun{
-    #' client$delete_node(1L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   client$delete_node(a)
+    #'   client$disconnect()
+    #' }
     #' }
     delete_node = function(node_id) {
       private$assert_connected()
@@ -345,13 +382,19 @@ AstraeaClient <- R6::R6Class(
     #' @return Integer scalar: the ID of the newly created edge.
     #'
     #' @examples
-    #' \dontrun{
-    #' eid <- client$create_edge(
-    #'   source    = 1L,
-    #'   target    = 2L,
-    #'   edge_type = "KNOWS",
-    #'   weight    = 0.9
-    #' )
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   eid <- client$create_edge(
+    #'     source    = a,
+    #'     target    = b,
+    #'     edge_type = "KNOWS",
+    #'     weight    = 0.9
+    #'   )
+    #'   client$disconnect()
+    #' }
     #' }
     create_edge = function(source, target, edge_type,
                            properties = list(), weight = 1.0,
@@ -393,9 +436,16 @@ AstraeaClient <- R6::R6Class(
     #'   \code{properties}, and optional temporal fields.
     #'
     #' @examples
-    #' \dontrun{
-    #' edge <- client$get_edge(1L)
-    #' edge$edge_type
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   e <- client$create_edge(a, b, "KNOWS")
+    #'   edge <- client$get_edge(e)
+    #'   edge$edge_type
+    #'   client$disconnect()
+    #' }
     #' }
     get_edge = function(edge_id) {
       private$assert_connected()
@@ -412,8 +462,15 @@ AstraeaClient <- R6::R6Class(
     #' @return The server response data (invisibly).
     #'
     #' @examples
-    #' \dontrun{
-    #' client$update_edge(1L, list(strength = "strong"))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   e <- client$create_edge(a, b, "KNOWS")
+    #'   client$update_edge(e, list(strength = "strong"))
+    #'   client$disconnect()
+    #' }
     #' }
     update_edge = function(edge_id, properties) {
       private$assert_connected()
@@ -434,8 +491,15 @@ AstraeaClient <- R6::R6Class(
     #' @return The server response data (invisibly).
     #'
     #' @examples
-    #' \dontrun{
-    #' client$delete_edge(1L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   e <- client$create_edge(a, b, "KNOWS")
+    #'   client$delete_edge(e)
+    #'   client$disconnect()
+    #' }
     #' }
     delete_edge = function(edge_id) {
       private$assert_connected()
@@ -464,9 +528,15 @@ AstraeaClient <- R6::R6Class(
     #'   least \code{node_id} and \code{edge_id}.
     #'
     #' @examples
-    #' \dontrun{
-    #' nbrs <- client$neighbors(1L, direction = "outgoing")
-    #' nbrs_knows <- client$neighbors(1L, edge_type = "KNOWS")
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   nbrs <- client$neighbors(a, direction = "outgoing")
+    #'   nbrs_knows <- client$neighbors(a, edge_type = "KNOWS")
+    #'   client$disconnect()
+    #' }
     #' }
     neighbors = function(node_id, direction = "outgoing", edge_type = NULL) {
       private$assert_connected()
@@ -492,8 +562,14 @@ AstraeaClient <- R6::R6Class(
     #'   and \code{depth} (integer).
     #'
     #' @examples
-    #' \dontrun{
-    #' bfs_result <- client$bfs(1L, max_depth = 2L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   bfs_result <- client$bfs(a, max_depth = b)
+    #'   client$disconnect()
+    #' }
     #' }
     bfs = function(start, max_depth = 3L) {
       private$assert_connected()
@@ -520,10 +596,16 @@ AstraeaClient <- R6::R6Class(
     #'   when \code{weighted = TRUE}).
     #'
     #' @examples
-    #' \dontrun{
-    #' sp <- client$shortest_path(1L, 5L, weighted = TRUE)
-    #' sp$path
-    #' sp$cost
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   sp <- client$shortest_path(a, b, weighted = TRUE)
+    #'   sp$path
+    #'   sp$cost
+    #'   client$disconnect()
+    #' }
     #' }
     shortest_path = function(from_node, to_node, weighted = FALSE) {
       private$assert_connected()
@@ -560,9 +642,15 @@ AstraeaClient <- R6::R6Class(
     #' @return A list of neighbor entries valid at the given timestamp.
     #'
     #' @examples
-    #' \dontrun{
-    #' # Neighbors as of January 1 2023 (ms since epoch)
-    #' nbrs <- client$neighbors_at(1L, "outgoing", 1672531200000)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   # Neighbors as of January 1 2023 (ms since epoch)
+    #'   nbrs <- client$neighbors_at(a, "outgoing", 1672531200000)
+    #'   client$disconnect()
+    #' }
     #' }
     neighbors_at = function(node_id, direction = "outgoing",
                             timestamp, edge_type = NULL) {
@@ -595,8 +683,14 @@ AstraeaClient <- R6::R6Class(
     #' @return A list of entries with \code{node_id} and \code{depth}.
     #'
     #' @examples
-    #' \dontrun{
-    #' result <- client$bfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   result <- client$bfs_at(a, max_depth = b, timestamp = 1672531200000)
+    #'   client$disconnect()
+    #' }
     #' }
     bfs_at = function(start, max_depth = 3L, timestamp) {
       private$assert_connected()
@@ -627,8 +721,14 @@ AstraeaClient <- R6::R6Class(
     #'   \code{cost}.
     #'
     #' @examples
-    #' \dontrun{
-    #' sp <- client$shortest_path_at(1L, 5L, timestamp = 1672531200000)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   sp <- client$shortest_path_at(a, b, timestamp = 1672531200000)
+    #'   client$disconnect()
+    #' }
     #' }
     shortest_path_at = function(from_node, to_node, timestamp,
                                 weighted = FALSE) {
@@ -660,8 +760,12 @@ AstraeaClient <- R6::R6Class(
     #' @return The query result data as returned by the server.
     #'
     #' @examples
-    #' \dontrun{
-    #' result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+    #'   client$disconnect()
+    #' }
     #' }
     query = function(gql) {
       private$assert_connected()
@@ -685,8 +789,13 @@ AstraeaClient <- R6::R6Class(
     #'   backward compatibility with older clients.
     #'
     #' @examples
-    #' \dontrun{
-    #' results <- client$vector_search(c(0.9, 0.1, 0.3), k = 5L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   dim <- client$ping()$vector_dim
+    #'   results <- client$vector_search(rep(0.1, dim), k = 5L)
+    #'   client$disconnect()
+    #' }
     #' }
     vector_search = function(query_vector, k = 10L) {
       private$assert_connected()
@@ -723,13 +832,20 @@ AstraeaClient <- R6::R6Class(
     #'   scores.
     #'
     #' @examples
-    #' \dontrun{
-    #' results <- client$hybrid_search(
-    #'   anchor = 1L,
-    #'   query_vector = c(0.9, 0.1, 0.3),
-    #'   k = 5L,
-    #'   alpha = 0.7
-    #' )
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   dim <- client$ping()$vector_dim
+    #'   results <- client$hybrid_search(
+    #'     anchor = a,
+    #'     query_vector = rep(0.1, dim),
+    #'     k = b,
+    #'     alpha = 0.7
+    #'   )
+    #'   client$disconnect()
+    #' }
     #' }
     hybrid_search = function(anchor, query_vector, max_hops = 3L,
                              k = 10L, alpha = 0.5) {
@@ -770,8 +886,15 @@ AstraeaClient <- R6::R6Class(
     #'   \code{distance} (smaller is closer to the concept).
     #'
     #' @examples
-    #' \dontrun{
-    #' nbrs <- client$semantic_neighbors(1L, c(0.0, 0.0, 1.0), k = 5L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   dim <- client$ping()$vector_dim
+    #'   nbrs <- client$semantic_neighbors(a, rep(0.1, dim), k = b)
+    #'   client$disconnect()
+    #' }
     #' }
     semantic_neighbors = function(node_id, concept, direction = "outgoing",
                                   k = 10L) {
@@ -805,8 +928,15 @@ AstraeaClient <- R6::R6Class(
     #' @return A list representing the walk path.
     #'
     #' @examples
-    #' \dontrun{
-    #' path <- client$semantic_walk(1L, c(0.1, 0.8, 0.5), max_hops = 4L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   dim <- client$ping()$vector_dim
+    #'   path <- client$semantic_walk(a, rep(0.1, dim), max_hops = 4L)
+    #'   client$disconnect()
+    #' }
     #' }
     semantic_walk = function(start, concept, max_hops = 3L) {
       private$assert_connected()
@@ -844,9 +974,15 @@ AstraeaClient <- R6::R6Class(
     #'   \code{node_count}, and \code{edge_count}.
     #'
     #' @examples
-    #' \dontrun{
-    #' sg <- client$extract_subgraph(1L, hops = 2L, max_nodes = 20L)
-    #' sg$text
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   sg <- client$extract_subgraph(a, hops = b, max_nodes = 20L)
+    #'   sg$text
+    #'   client$disconnect()
+    #' }
     #' }
     extract_subgraph = function(center, hops = 2L, max_nodes = 50L,
                                 format = "structured") {
@@ -890,11 +1026,17 @@ AstraeaClient <- R6::R6Class(
     #'   \code{answer} field.
     #'
     #' @examples
-    #' \dontrun{
-    #' answer <- client$graph_rag(
-    #'   question = "What does Alice work on?",
-    #'   anchor = 1L
-    #' )
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   answer <- client$graph_rag(
+    #'     question = "What does Alice work on?",
+    #'     anchor = a
+    #'   )
+    #'   client$disconnect()
+    #' }
     #' }
     graph_rag = function(question, anchor = NULL, question_embedding = NULL,
                          hops = 2L, max_nodes = 50L, format = "structured") {
@@ -938,8 +1080,14 @@ AstraeaClient <- R6::R6Class(
     #' @return A list of node IDs (integers) in depth-first visitation order.
     #'
     #' @examples
-    #' \dontrun{
-    #' visited <- client$dfs(1L, max_depth = 2L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   visited <- client$dfs(a, max_depth = b)
+    #'   client$disconnect()
+    #' }
     #' }
     dfs = function(start, max_depth = 3L) {
       private$assert_connected()
@@ -965,8 +1113,14 @@ AstraeaClient <- R6::R6Class(
     #'   order as of \code{timestamp}.
     #'
     #' @examples
-    #' \dontrun{
-    #' visited <- client$dfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   visited <- client$dfs_at(a, max_depth = b, timestamp = 1672531200000)
+    #'   client$disconnect()
+    #' }
     #' }
     dfs_at = function(start, max_depth = 3L, timestamp) {
       private$assert_connected()
@@ -996,8 +1150,12 @@ AstraeaClient <- R6::R6Class(
     #' @return A list of matching node IDs (integers).
     #'
     #' @examples
-    #' \dontrun{
-    #' ids <- client$find_by_label("Person")
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   ids <- client$find_by_label("Person")
+    #'   client$disconnect()
+    #' }
     #' }
     find_by_label = function(label) {
       private$assert_connected()
@@ -1017,8 +1175,12 @@ AstraeaClient <- R6::R6Class(
     #'   \code{source}, and \code{target} node IDs.
     #'
     #' @examples
-    #' \dontrun{
-    #' edges <- client$find_edge_by_type("KNOWS")
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   edges <- client$find_edge_by_type("KNOWS")
+    #'   client$disconnect()
+    #' }
     #' }
     find_edge_by_type = function(edge_type) {
       private$assert_connected()
@@ -1037,8 +1199,12 @@ AstraeaClient <- R6::R6Class(
     #' @return Integer scalar: the number of nodes deleted.
     #'
     #' @examples
-    #' \dontrun{
-    #' n_removed <- client$delete_by_label("Temporary")
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   n_removed <- client$delete_by_label("Temporary")
+    #'   client$disconnect()
+    #' }
     #' }
     delete_by_label = function(label) {
       private$assert_connected()
@@ -1070,8 +1236,14 @@ AstraeaClient <- R6::R6Class(
     #'   \code{valid_from}, \code{valid_to}).
     #'
     #' @examples
-    #' \dontrun{
-    #' sg <- client$get_subgraph(1L, hops = 2L, max_nodes = 100L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   sg <- client$get_subgraph(a, hops = b, max_nodes = 100L)
+    #'   client$disconnect()
+    #' }
     #' }
     get_subgraph = function(center, hops = 3L, max_nodes = 50L) {
       private$assert_connected()
@@ -1098,9 +1270,13 @@ AstraeaClient <- R6::R6Class(
     #'   \code{total_edges}, and \code{labels} (a per-label node count).
     #'
     #' @examples
-    #' \dontrun{
-    #' stats <- client$graph_stats()
-    #' stats$total_nodes
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   stats <- client$graph_stats()
+    #'   stats$total_nodes
+    #'   client$disconnect()
+    #' }
     #' }
     graph_stats = function() {
       private$assert_connected()
@@ -1125,8 +1301,12 @@ AstraeaClient <- R6::R6Class(
     #'   PageRank score.
     #'
     #' @examples
-    #' \dontrun{
-    #' scores <- client$run_pagerank()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   scores <- client$run_pagerank()
+    #'   client$disconnect()
+    #' }
     #' }
     run_pagerank = function(nodes = NULL, damping = 0.85,
                             max_iterations = 100L, tolerance = 1e-6) {
@@ -1157,9 +1337,13 @@ AstraeaClient <- R6::R6Class(
     #'   to community index) and \code{num_communities}.
     #'
     #' @examples
-    #' \dontrun{
-    #' res <- client$run_louvain()
-    #' res$num_communities
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   res <- client$run_louvain()
+    #'   res$num_communities
+    #'   client$disconnect()
+    #' }
     #' }
     run_louvain = function(nodes = NULL) {
       private$assert_connected()
@@ -1180,9 +1364,13 @@ AstraeaClient <- R6::R6Class(
     #'   node IDs) and \code{count}.
     #'
     #' @examples
-    #' \dontrun{
-    #' cc <- client$run_connected_components()
-    #' cc$count
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   cc <- client$run_connected_components()
+    #'   cc$count
+    #'   client$disconnect()
+    #' }
     #' }
     run_connected_components = function(nodes = NULL, strong = FALSE) {
       private$assert_connected()
@@ -1203,8 +1391,12 @@ AstraeaClient <- R6::R6Class(
     #'   degree-centrality score.
     #'
     #' @examples
-    #' \dontrun{
-    #' scores <- client$run_degree_centrality(direction = "both")
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   scores <- client$run_degree_centrality(direction = "both")
+    #'   client$disconnect()
+    #' }
     #' }
     run_degree_centrality = function(nodes = NULL, direction = "outgoing") {
       private$assert_connected()
@@ -1227,8 +1419,12 @@ AstraeaClient <- R6::R6Class(
     #'   betweenness-centrality score.
     #'
     #' @examples
-    #' \dontrun{
-    #' scores <- client$run_betweenness_centrality()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   scores <- client$run_betweenness_centrality()
+    #'   client$disconnect()
+    #' }
     #' }
     run_betweenness_centrality = function(nodes = NULL) {
       private$assert_connected()
@@ -1253,11 +1449,15 @@ AstraeaClient <- R6::R6Class(
     #'   the input.
     #'
     #' @examples
-    #' \dontrun{
-    #' ids <- client$create_nodes(list(
-    #'   list(labels = "Person", properties = list(name = "Alice")),
-    #'   list(labels = "Person", properties = list(name = "Bob"))
-    #' ))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   ids <- client$create_nodes(list(
+    #'     list(labels = "Person", properties = list(name = "Alice")),
+    #'     list(labels = "Person", properties = list(name = "Bob"))
+    #'   ))
+    #'   client$disconnect()
+    #' }
     #' }
     create_nodes = function(nodes_list) {
       private$assert_connected()
@@ -1282,11 +1482,17 @@ AstraeaClient <- R6::R6Class(
     #'   the input.
     #'
     #' @examples
-    #' \dontrun{
-    #' eids <- client$create_edges(list(
-    #'   list(source = 1L, target = 2L, edge_type = "KNOWS"),
-    #'   list(source = 2L, target = 3L, edge_type = "FOLLOWS", weight = 0.5)
-    #' ))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   eids <- client$create_edges(list(
+    #'     list(source = a, target = b, edge_type = "KNOWS"),
+    #'     list(source = b, target = b, edge_type = "FOLLOWS", weight = 0.5)
+    #'   ))
+    #'   client$disconnect()
+    #' }
     #' }
     create_edges = function(edges_list) {
       private$assert_connected()
@@ -1312,8 +1518,14 @@ AstraeaClient <- R6::R6Class(
     #' @return Integer scalar: the count of successfully deleted nodes.
     #'
     #' @examples
-    #' \dontrun{
-    #' deleted <- client$delete_nodes(c(1L, 2L, 3L))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   deleted <- client$delete_nodes(c(a, b))
+    #'   client$disconnect()
+    #' }
     #' }
     delete_nodes = function(node_ids) {
       private$assert_connected()
@@ -1337,8 +1549,12 @@ AstraeaClient <- R6::R6Class(
     #' @return Integer scalar: the count of successfully deleted edges.
     #'
     #' @examples
-    #' \dontrun{
-    #' deleted <- client$delete_edges(c(1L, 2L))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   deleted <- client$delete_edges(e)
+    #'   client$disconnect()
+    #' }
     #' }
     delete_edges = function(edge_ids) {
       private$assert_connected()
@@ -1376,14 +1592,18 @@ AstraeaClient <- R6::R6Class(
     #' @return An integer vector of created node IDs.
     #'
     #' @examples
-    #' \dontrun{
-    #' df <- data.frame(
-    #'   label = c("Person", "Person"),
-    #'   name  = c("Alice", "Bob"),
-    #'   age   = c(30, 25),
-    #'   stringsAsFactors = FALSE
-    #' )
-    #' ids <- client$import_nodes_df(df)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   df <- data.frame(
+    #'     label = c("Person", "Person"),
+    #'     name  = c("Alice", "Bob"),
+    #'     age   = c(30, 25),
+    #'     stringsAsFactors = FALSE
+    #'   )
+    #'   ids <- client$import_nodes_df(df)
+    #'   client$disconnect()
+    #' }
     #' }
     import_nodes_df = function(df, label_col = "label", id_col = NULL,
                                embedding_cols = NULL) {
@@ -1447,14 +1667,20 @@ AstraeaClient <- R6::R6Class(
     #' @return An integer vector of created edge IDs.
     #'
     #' @examples
-    #' \dontrun{
-    #' edf <- data.frame(
-    #'   source = c(1L, 2L),
-    #'   target = c(2L, 3L),
-    #'   type   = c("KNOWS", "FOLLOWS"),
-    #'   stringsAsFactors = FALSE
-    #' )
-    #' eids <- client$import_edges_df(edf)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   edf <- data.frame(
+    #'     source = c(a, b),
+    #'     target = c(b, a),
+    #'     type   = c("KNOWS", "FOLLOWS"),
+    #'     stringsAsFactors = FALSE
+    #'   )
+    #'   eids <- client$import_edges_df(edf)
+    #'   client$disconnect()
+    #' }
     #' }
     import_edges_df = function(df, source_col = "source",
                                target_col = "target", type_col = "type",
@@ -1516,8 +1742,14 @@ AstraeaClient <- R6::R6Class(
     #' @return A \code{data.frame} with one row per node.
     #'
     #' @examples
-    #' \dontrun{
-    #' df <- client$export_nodes_df(c(1L, 2L, 3L))
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   df <- client$export_nodes_df(c(a, b))
+    #'   client$disconnect()
+    #' }
     #' }
     export_nodes_df = function(node_ids) {
       private$assert_connected()
@@ -1563,8 +1795,14 @@ AstraeaClient <- R6::R6Class(
     #'   \code{labels}, and flattened property columns.
     #'
     #' @examples
-    #' \dontrun{
-    #' bfs_df <- client$export_bfs_df(1L, max_depth = 2L)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   bfs_df <- client$export_bfs_df(a, max_depth = b)
+    #'   client$disconnect()
+    #' }
     #' }
     export_bfs_df = function(start, max_depth = 3L) {
       private$assert_connected()
@@ -1616,9 +1854,14 @@ AstraeaClient <- R6::R6Class(
     #'   an empty \code{data.frame} if \code{results} is empty.
     #'
     #' @examples
-    #' \dontrun{
-    #' results <- client$vector_search(c(0.9, 0.1, 0.3), k = 5L)
-    #' df <- client$results_to_dataframe(results)
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   dim <- client$ping()$vector_dim
+    #'   results <- client$vector_search(rep(0.1, dim), k = 5L)
+    #'   df <- client$results_to_dataframe(results)
+    #'   client$disconnect()
+    #' }
     #' }
     results_to_dataframe = function(results) {
       if (length(results) == 0L) return(data.frame())
@@ -1637,9 +1880,15 @@ AstraeaClient <- R6::R6Class(
     #'   (list column), and flattened property columns.
     #'
     #' @examples
-    #' \dontrun{
-    #' df <- client$nodes_to_dataframe(c(1L, 2L, 3L))
-    #' df$labels[[1]]
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- astraea_connect()
+    #'   a <- client$create_node(c("Person"), list(name = "Alice"))
+    #'   b <- client$create_node(c("Person"), list(name = "Bob"))
+    #'   df <- client$nodes_to_dataframe(c(a, b))
+    #'   df$labels[[1]]
+    #'   client$disconnect()
+    #' }
     #' }
     nodes_to_dataframe = function(node_ids) {
       private$assert_connected()

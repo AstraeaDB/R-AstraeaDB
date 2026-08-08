@@ -43,474 +43,723 @@ constructor. The token is automatically attached to every request.
 }
 
 \examples{
-\dontrun{
-# Connect to a local AstraeaDB server
-client <- AstraeaClient$new()
-client$connect()
+\donttest{
+if (astraea_server_available()) {
+  # Connect to a local AstraeaDB server
+  client <- AstraeaClient$new()
+  client$connect()
 
-# Health check
-client$ping()
+  # Health check
+  client$ping()
 
-# Create nodes
-alice_id <- client$create_node(
-  labels = c("Person"),
-  properties = list(name = "Alice", age = 30)
-)
-bob_id <- client$create_node(
-  labels = c("Person"),
-  properties = list(name = "Bob", age = 25)
-)
+  # Create nodes
+  alice_id <- client$create_node(
+    labels = c("Person"),
+    properties = list(name = "Alice", age = 30)
+  )
+  bob_id <- client$create_node(
+    labels = c("Person"),
+    properties = list(name = "Bob", age = 25)
+  )
 
-# Create an edge
-edge_id <- client$create_edge(
-  source = alice_id,
-  target = bob_id,
-  edge_type = "KNOWS",
-  properties = list(since = 2020)
-)
+  # Create an edge
+  edge_id <- client$create_edge(
+    source = alice_id,
+    target = bob_id,
+    edge_type = "KNOWS",
+    properties = list(since = 2020)
+  )
 
-# Traverse the graph
-client$neighbors(alice_id, direction = "outgoing")
-client$bfs(alice_id, max_depth = 2L)
+  # Traverse the graph
+  client$neighbors(alice_id, direction = "outgoing")
+  client$bfs(alice_id, max_depth = 2L)
 
-# Clean up
-client$disconnect()
+  # Clean up
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$new`
 ## ------------------------------------------------
 
-\dontrun{
 client <- AstraeaClient$new()
 client <- AstraeaClient$new(host = "db.example.com", port = 7688L)
 client <- AstraeaClient$new(auth_token = "my-secret-token")
-}
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$connect`
 ## ------------------------------------------------
 
-\dontrun{
-client <- AstraeaClient$new()
-client$connect()
+\donttest{
+if (astraea_server_available()) {
+  client <- AstraeaClient$new()
+  client$connect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$disconnect`
 ## ------------------------------------------------
 
-\dontrun{
-client$disconnect()
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  client$disconnect()
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$is_connected`
 ## ------------------------------------------------
 
-\dontrun{
-client$is_connected()
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  client$is_connected()
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$ping`
 ## ------------------------------------------------
 
-\dontrun{
-info <- client$ping()
-message(info$version)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  info <- client$ping()
+  message(info$version)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$create_node`
 ## ------------------------------------------------
 
-\dontrun{
-nid <- client$create_node(
-  labels = c("Person"),
-  properties = list(name = "Alice", age = 30),
-  embedding = c(0.1, 0.9, 0.3)
-)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  dim <- client$ping()$vector_dim
+  nid <- client$create_node(
+    labels = c("Person"),
+    properties = list(name = "Alice", age = 30),
+    embedding = rep(0.1, dim)
+  )
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$get_node`
 ## ------------------------------------------------
 
-\dontrun{
-node <- client$get_node(1L)
-node$labels
-node$properties$name
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  node <- client$get_node(a)
+  node$labels
+  node$properties$name
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$update_node`
 ## ------------------------------------------------
 
-\dontrun{
-client$update_node(1L, list(city = "San Francisco"))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  client$update_node(a, list(city = "San Francisco"))
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$delete_node`
 ## ------------------------------------------------
 
-\dontrun{
-client$delete_node(1L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  client$delete_node(a)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$create_edge`
 ## ------------------------------------------------
 
-\dontrun{
-eid <- client$create_edge(
-  source    = 1L,
-  target    = 2L,
-  edge_type = "KNOWS",
-  weight    = 0.9
-)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  eid <- client$create_edge(
+    source    = a,
+    target    = b,
+    edge_type = "KNOWS",
+    weight    = 0.9
+  )
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$get_edge`
 ## ------------------------------------------------
 
-\dontrun{
-edge <- client$get_edge(1L)
-edge$edge_type
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  e <- client$create_edge(a, b, "KNOWS")
+  edge <- client$get_edge(e)
+  edge$edge_type
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$update_edge`
 ## ------------------------------------------------
 
-\dontrun{
-client$update_edge(1L, list(strength = "strong"))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  e <- client$create_edge(a, b, "KNOWS")
+  client$update_edge(e, list(strength = "strong"))
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$delete_edge`
 ## ------------------------------------------------
 
-\dontrun{
-client$delete_edge(1L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  e <- client$create_edge(a, b, "KNOWS")
+  client$delete_edge(e)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$neighbors`
 ## ------------------------------------------------
 
-\dontrun{
-nbrs <- client$neighbors(1L, direction = "outgoing")
-nbrs_knows <- client$neighbors(1L, edge_type = "KNOWS")
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  nbrs <- client$neighbors(a, direction = "outgoing")
+  nbrs_knows <- client$neighbors(a, edge_type = "KNOWS")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$bfs`
 ## ------------------------------------------------
 
-\dontrun{
-bfs_result <- client$bfs(1L, max_depth = 2L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  bfs_result <- client$bfs(a, max_depth = b)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$shortest_path`
 ## ------------------------------------------------
 
-\dontrun{
-sp <- client$shortest_path(1L, 5L, weighted = TRUE)
-sp$path
-sp$cost
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sp <- client$shortest_path(a, b, weighted = TRUE)
+  sp$path
+  sp$cost
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$neighbors_at`
 ## ------------------------------------------------
 
-\dontrun{
-# Neighbors as of January 1 2023 (ms since epoch)
-nbrs <- client$neighbors_at(1L, "outgoing", 1672531200000)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  # Neighbors as of January 1 2023 (ms since epoch)
+  nbrs <- client$neighbors_at(a, "outgoing", 1672531200000)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$bfs_at`
 ## ------------------------------------------------
 
-\dontrun{
-result <- client$bfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  result <- client$bfs_at(a, max_depth = b, timestamp = 1672531200000)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$shortest_path_at`
 ## ------------------------------------------------
 
-\dontrun{
-sp <- client$shortest_path_at(1L, 5L, timestamp = 1672531200000)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sp <- client$shortest_path_at(a, b, timestamp = 1672531200000)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$query`
 ## ------------------------------------------------
 
-\dontrun{
-result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$vector_search`
 ## ------------------------------------------------
 
-\dontrun{
-results <- client$vector_search(c(0.9, 0.1, 0.3), k = 5L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  dim <- client$ping()$vector_dim
+  results <- client$vector_search(rep(0.1, dim), k = 5L)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$hybrid_search`
 ## ------------------------------------------------
 
-\dontrun{
-results <- client$hybrid_search(
-  anchor = 1L,
-  query_vector = c(0.9, 0.1, 0.3),
-  k = 5L,
-  alpha = 0.7
-)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  dim <- client$ping()$vector_dim
+  results <- client$hybrid_search(
+    anchor = a,
+    query_vector = rep(0.1, dim),
+    k = b,
+    alpha = 0.7
+  )
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$semantic_neighbors`
 ## ------------------------------------------------
 
-\dontrun{
-nbrs <- client$semantic_neighbors(1L, c(0.0, 0.0, 1.0), k = 5L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  dim <- client$ping()$vector_dim
+  nbrs <- client$semantic_neighbors(a, rep(0.1, dim), k = b)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$semantic_walk`
 ## ------------------------------------------------
 
-\dontrun{
-path <- client$semantic_walk(1L, c(0.1, 0.8, 0.5), max_hops = 4L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  dim <- client$ping()$vector_dim
+  path <- client$semantic_walk(a, rep(0.1, dim), max_hops = 4L)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$extract_subgraph`
 ## ------------------------------------------------
 
-\dontrun{
-sg <- client$extract_subgraph(1L, hops = 2L, max_nodes = 20L)
-sg$text
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sg <- client$extract_subgraph(a, hops = b, max_nodes = 20L)
+  sg$text
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$graph_rag`
 ## ------------------------------------------------
 
-\dontrun{
-answer <- client$graph_rag(
-  question = "What does Alice work on?",
-  anchor = 1L
-)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  answer <- client$graph_rag(
+    question = "What does Alice work on?",
+    anchor = a
+  )
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$dfs`
 ## ------------------------------------------------
 
-\dontrun{
-visited <- client$dfs(1L, max_depth = 2L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  visited <- client$dfs(a, max_depth = b)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$dfs_at`
 ## ------------------------------------------------
 
-\dontrun{
-visited <- client$dfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  visited <- client$dfs_at(a, max_depth = b, timestamp = 1672531200000)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$find_by_label`
 ## ------------------------------------------------
 
-\dontrun{
-ids <- client$find_by_label("Person")
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  ids <- client$find_by_label("Person")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$find_edge_by_type`
 ## ------------------------------------------------
 
-\dontrun{
-edges <- client$find_edge_by_type("KNOWS")
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  edges <- client$find_edge_by_type("KNOWS")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$delete_by_label`
 ## ------------------------------------------------
 
-\dontrun{
-n_removed <- client$delete_by_label("Temporary")
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  n_removed <- client$delete_by_label("Temporary")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$get_subgraph`
 ## ------------------------------------------------
 
-\dontrun{
-sg <- client$get_subgraph(1L, hops = 2L, max_nodes = 100L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sg <- client$get_subgraph(a, hops = b, max_nodes = 100L)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$graph_stats`
 ## ------------------------------------------------
 
-\dontrun{
-stats <- client$graph_stats()
-stats$total_nodes
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  stats <- client$graph_stats()
+  stats$total_nodes
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$run_pagerank`
 ## ------------------------------------------------
 
-\dontrun{
-scores <- client$run_pagerank()
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  scores <- client$run_pagerank()
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$run_louvain`
 ## ------------------------------------------------
 
-\dontrun{
-res <- client$run_louvain()
-res$num_communities
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  res <- client$run_louvain()
+  res$num_communities
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$run_connected_components`
 ## ------------------------------------------------
 
-\dontrun{
-cc <- client$run_connected_components()
-cc$count
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  cc <- client$run_connected_components()
+  cc$count
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$run_degree_centrality`
 ## ------------------------------------------------
 
-\dontrun{
-scores <- client$run_degree_centrality(direction = "both")
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  scores <- client$run_degree_centrality(direction = "both")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$run_betweenness_centrality`
 ## ------------------------------------------------
 
-\dontrun{
-scores <- client$run_betweenness_centrality()
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  scores <- client$run_betweenness_centrality()
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$create_nodes`
 ## ------------------------------------------------
 
-\dontrun{
-ids <- client$create_nodes(list(
-  list(labels = "Person", properties = list(name = "Alice")),
-  list(labels = "Person", properties = list(name = "Bob"))
-))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  ids <- client$create_nodes(list(
+    list(labels = "Person", properties = list(name = "Alice")),
+    list(labels = "Person", properties = list(name = "Bob"))
+  ))
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$create_edges`
 ## ------------------------------------------------
 
-\dontrun{
-eids <- client$create_edges(list(
-  list(source = 1L, target = 2L, edge_type = "KNOWS"),
-  list(source = 2L, target = 3L, edge_type = "FOLLOWS", weight = 0.5)
-))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  eids <- client$create_edges(list(
+    list(source = a, target = b, edge_type = "KNOWS"),
+    list(source = b, target = b, edge_type = "FOLLOWS", weight = 0.5)
+  ))
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$delete_nodes`
 ## ------------------------------------------------
 
-\dontrun{
-deleted <- client$delete_nodes(c(1L, 2L, 3L))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  deleted <- client$delete_nodes(c(a, b))
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$delete_edges`
 ## ------------------------------------------------
 
-\dontrun{
-deleted <- client$delete_edges(c(1L, 2L))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  deleted <- client$delete_edges(e)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$import_nodes_df`
 ## ------------------------------------------------
 
-\dontrun{
-df <- data.frame(
-  label = c("Person", "Person"),
-  name  = c("Alice", "Bob"),
-  age   = c(30, 25),
-  stringsAsFactors = FALSE
-)
-ids <- client$import_nodes_df(df)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  df <- data.frame(
+    label = c("Person", "Person"),
+    name  = c("Alice", "Bob"),
+    age   = c(30, 25),
+    stringsAsFactors = FALSE
+  )
+  ids <- client$import_nodes_df(df)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$import_edges_df`
 ## ------------------------------------------------
 
-\dontrun{
-edf <- data.frame(
-  source = c(1L, 2L),
-  target = c(2L, 3L),
-  type   = c("KNOWS", "FOLLOWS"),
-  stringsAsFactors = FALSE
-)
-eids <- client$import_edges_df(edf)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  edf <- data.frame(
+    source = c(a, b),
+    target = c(b, a),
+    type   = c("KNOWS", "FOLLOWS"),
+    stringsAsFactors = FALSE
+  )
+  eids <- client$import_edges_df(edf)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$export_nodes_df`
 ## ------------------------------------------------
 
-\dontrun{
-df <- client$export_nodes_df(c(1L, 2L, 3L))
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  df <- client$export_nodes_df(c(a, b))
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$export_bfs_df`
 ## ------------------------------------------------
 
-\dontrun{
-bfs_df <- client$export_bfs_df(1L, max_depth = 2L)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  bfs_df <- client$export_bfs_df(a, max_depth = b)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$results_to_dataframe`
 ## ------------------------------------------------
 
-\dontrun{
-results <- client$vector_search(c(0.9, 0.1, 0.3), k = 5L)
-df <- client$results_to_dataframe(results)
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  dim <- client$ping()$vector_dim
+  results <- client$vector_search(rep(0.1, dim), k = 5L)
+  df <- client$results_to_dataframe(results)
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `AstraeaClient$nodes_to_dataframe`
 ## ------------------------------------------------
 
-\dontrun{
-df <- client$nodes_to_dataframe(c(1L, 2L, 3L))
-df$labels[[1]]
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  df <- client$nodes_to_dataframe(c(a, b))
+  df$labels[[1]]
+  client$disconnect()
+}
 }
 }
 \section{Public fields}{
@@ -609,11 +858,9 @@ An \code{AstraeaClient} object (invisibly).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- AstraeaClient$new()
+\preformatted{client <- AstraeaClient$new()
 client <- AstraeaClient$new(host = "db.example.com", port = 7688L)
 client <- AstraeaClient$new(auth_token = "my-secret-token")
-}
 }
 \if{html}{\out{</div>}}
 
@@ -634,9 +881,11 @@ The client object (invisibly), for method chaining.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- AstraeaClient$new()
-client$connect()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- AstraeaClient$new()
+  client$connect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -658,8 +907,12 @@ The client object (invisibly).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client$disconnect()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  client$disconnect()
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -682,8 +935,12 @@ otherwise.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client$is_connected()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  client$is_connected()
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -726,9 +983,13 @@ A list with server information (e.g., \code{version},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-info <- client$ping()
-message(info$version)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  info <- client$ping()
+  message(info$version)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -762,12 +1023,17 @@ Integer scalar: the ID of the newly created node.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-nid <- client$create_node(
-  labels = c("Person"),
-  properties = list(name = "Alice", age = 30),
-  embedding = c(0.1, 0.9, 0.3)
-)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  dim <- client$ping()$vector_dim
+  nid <- client$create_node(
+    labels = c("Person"),
+    properties = list(name = "Alice", age = 30),
+    embedding = rep(0.1, dim)
+  )
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -797,10 +1063,16 @@ A list with \code{labels} (character vector) and
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-node <- client$get_node(1L)
-node$labels
-node$properties$name
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  node <- client$get_node(a)
+  node$labels
+  node$properties$name
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -832,8 +1104,14 @@ The server response data (invisibly).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client$update_node(1L, list(city = "San Francisco"))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  client$update_node(a, list(city = "San Francisco"))
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -862,8 +1140,14 @@ The server response data (invisibly).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client$delete_node(1L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  client$delete_node(a)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -916,13 +1200,19 @@ Integer scalar: the ID of the newly created edge.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-eid <- client$create_edge(
-  source    = 1L,
-  target    = 2L,
-  edge_type = "KNOWS",
-  weight    = 0.9
-)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  eid <- client$create_edge(
+    source    = a,
+    target    = b,
+    edge_type = "KNOWS",
+    weight    = 0.9
+  )
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -952,9 +1242,16 @@ A list with \code{source}, \code{target}, \code{edge_type},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-edge <- client$get_edge(1L)
-edge$edge_type
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  e <- client$create_edge(a, b, "KNOWS")
+  edge <- client$get_edge(e)
+  edge$edge_type
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -985,8 +1282,15 @@ The server response data (invisibly).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client$update_edge(1L, list(strength = "strong"))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  e <- client$create_edge(a, b, "KNOWS")
+  client$update_edge(e, list(strength = "strong"))
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1015,8 +1319,15 @@ The server response data (invisibly).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client$delete_edge(1L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  e <- client$create_edge(a, b, "KNOWS")
+  client$delete_edge(e)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1053,9 +1364,15 @@ least \code{node_id} and \code{edge_id}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-nbrs <- client$neighbors(1L, direction = "outgoing")
-nbrs_knows <- client$neighbors(1L, edge_type = "KNOWS")
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  nbrs <- client$neighbors(a, direction = "outgoing")
+  nbrs_knows <- client$neighbors(a, edge_type = "KNOWS")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1088,8 +1405,14 @@ and \code{depth} (integer).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-bfs_result <- client$bfs(1L, max_depth = 2L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  bfs_result <- client$bfs(a, max_depth = b)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1125,10 +1448,16 @@ when \code{weighted = TRUE}).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-sp <- client$shortest_path(1L, 5L, weighted = TRUE)
-sp$path
-sp$cost
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sp <- client$shortest_path(a, b, weighted = TRUE)
+  sp$path
+  sp$cost
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1173,9 +1502,15 @@ A list of neighbor entries valid at the given timestamp.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-# Neighbors as of January 1 2023 (ms since epoch)
-nbrs <- client$neighbors_at(1L, "outgoing", 1672531200000)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  # Neighbors as of January 1 2023 (ms since epoch)
+  nbrs <- client$neighbors_at(a, "outgoing", 1672531200000)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1209,8 +1544,14 @@ A list of entries with \code{node_id} and \code{depth}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-result <- client$bfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  result <- client$bfs_at(a, max_depth = b, timestamp = 1672531200000)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1247,8 +1588,14 @@ A list with \code{path}, \code{length}, and optionally
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-sp <- client$shortest_path_at(1L, 5L, timestamp = 1672531200000)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sp <- client$shortest_path_at(a, b, timestamp = 1672531200000)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1277,8 +1624,12 @@ The query result data as returned by the server.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  result <- client$query("MATCH (p:Person) RETURN p.name, p.city")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1313,8 +1664,13 @@ backward compatibility with older clients.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-results <- client$vector_search(c(0.9, 0.1, 0.3), k = 5L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  dim <- client$ping()$vector_dim
+  results <- client$vector_search(rep(0.1, dim), k = 5L)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1364,13 +1720,20 @@ scores.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-results <- client$hybrid_search(
-  anchor = 1L,
-  query_vector = c(0.9, 0.1, 0.3),
-  k = 5L,
-  alpha = 0.7
-)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  dim <- client$ping()$vector_dim
+  results <- client$hybrid_search(
+    anchor = a,
+    query_vector = rep(0.1, dim),
+    k = b,
+    alpha = 0.7
+  )
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1414,8 +1777,15 @@ A list of neighbor entries with \code{node_id} and
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-nbrs <- client$semantic_neighbors(1L, c(0.0, 0.0, 1.0), k = 5L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  dim <- client$ping()$vector_dim
+  nbrs <- client$semantic_neighbors(a, rep(0.1, dim), k = b)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1450,8 +1820,15 @@ A list representing the walk path.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-path <- client$semantic_walk(1L, c(0.1, 0.8, 0.5), max_hops = 4L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  dim <- client$ping()$vector_dim
+  path <- client$semantic_walk(a, rep(0.1, dim), max_hops = 4L)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1495,9 +1872,15 @@ A list with extracted subgraph data including \code{text},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-sg <- client$extract_subgraph(1L, hops = 2L, max_nodes = 20L)
-sg$text
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sg <- client$extract_subgraph(a, hops = b, max_nodes = 20L)
+  sg$text
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1552,11 +1935,17 @@ A list with the RAG result, typically including an
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-answer <- client$graph_rag(
-  question = "What does Alice work on?",
-  anchor = 1L
-)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  answer <- client$graph_rag(
+    question = "What does Alice work on?",
+    anchor = a
+  )
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1588,8 +1977,14 @@ A list of node IDs (integers) in depth-first visitation order.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-visited <- client$dfs(1L, max_depth = 2L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  visited <- client$dfs(a, max_depth = b)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1624,8 +2019,14 @@ order as of \code{timestamp}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-visited <- client$dfs_at(1L, max_depth = 2L, timestamp = 1672531200000)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  visited <- client$dfs_at(a, max_depth = b, timestamp = 1672531200000)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1654,8 +2055,12 @@ A list of matching node IDs (integers).
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-ids <- client$find_by_label("Person")
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  ids <- client$find_by_label("Person")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1685,8 +2090,12 @@ A list of entries, each a list with \code{edge_id},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-edges <- client$find_edge_by_type("KNOWS")
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  edges <- client$find_edge_by_type("KNOWS")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1715,8 +2124,12 @@ Integer scalar: the number of nodes deleted.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-n_removed <- client$delete_by_label("Temporary")
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  n_removed <- client$delete_by_label("Temporary")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1756,8 +2169,14 @@ A list with \code{nodes} (each a list with \code{id},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-sg <- client$get_subgraph(1L, hops = 2L, max_nodes = 100L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  sg <- client$get_subgraph(a, hops = b, max_nodes = 100L)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1781,9 +2200,13 @@ A named list of statistics, including \code{total_nodes},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-stats <- client$graph_stats()
-stats$total_nodes
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  stats <- client$graph_stats()
+  stats$total_nodes
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1827,8 +2250,12 @@ PageRank score.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-scores <- client$run_pagerank()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  scores <- client$run_pagerank()
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1859,9 +2286,13 @@ to community index) and \code{num_communities}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-res <- client$run_louvain()
-res$num_communities
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  res <- client$run_louvain()
+  res$num_communities
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1896,9 +2327,13 @@ node IDs) and \code{count}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-cc <- client$run_connected_components()
-cc$count
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  cc <- client$run_connected_components()
+  cc$count
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1932,8 +2367,12 @@ degree-centrality score.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-scores <- client$run_degree_centrality(direction = "both")
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  scores <- client$run_degree_centrality(direction = "both")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1964,8 +2403,12 @@ betweenness-centrality score.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-scores <- client$run_betweenness_centrality()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  scores <- client$run_betweenness_centrality()
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1998,11 +2441,15 @@ the input.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-ids <- client$create_nodes(list(
-  list(labels = "Person", properties = list(name = "Alice")),
-  list(labels = "Person", properties = list(name = "Bob"))
-))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  ids <- client$create_nodes(list(
+    list(labels = "Person", properties = list(name = "Alice")),
+    list(labels = "Person", properties = list(name = "Bob"))
+  ))
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2035,11 +2482,17 @@ the input.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-eids <- client$create_edges(list(
-  list(source = 1L, target = 2L, edge_type = "KNOWS"),
-  list(source = 2L, target = 3L, edge_type = "FOLLOWS", weight = 0.5)
-))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  eids <- client$create_edges(list(
+    list(source = a, target = b, edge_type = "KNOWS"),
+    list(source = b, target = b, edge_type = "FOLLOWS", weight = 0.5)
+  ))
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2069,8 +2522,14 @@ Integer scalar: the count of successfully deleted nodes.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-deleted <- client$delete_nodes(c(1L, 2L, 3L))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  deleted <- client$delete_nodes(c(a, b))
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2100,8 +2559,12 @@ Integer scalar: the count of successfully deleted edges.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-deleted <- client$delete_edges(c(1L, 2L))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  deleted <- client$delete_edges(e)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2149,14 +2612,18 @@ An integer vector of created node IDs.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-df <- data.frame(
-  label = c("Person", "Person"),
-  name  = c("Alice", "Bob"),
-  age   = c(30, 25),
-  stringsAsFactors = FALSE
-)
-ids <- client$import_nodes_df(df)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  df <- data.frame(
+    label = c("Person", "Person"),
+    name  = c("Alice", "Bob"),
+    age   = c(30, 25),
+    stringsAsFactors = FALSE
+  )
+  ids <- client$import_nodes_df(df)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2215,14 +2682,20 @@ An integer vector of created edge IDs.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-edf <- data.frame(
-  source = c(1L, 2L),
-  target = c(2L, 3L),
-  type   = c("KNOWS", "FOLLOWS"),
-  stringsAsFactors = FALSE
-)
-eids <- client$import_edges_df(edf)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  edf <- data.frame(
+    source = c(a, b),
+    target = c(b, a),
+    type   = c("KNOWS", "FOLLOWS"),
+    stringsAsFactors = FALSE
+  )
+  eids <- client$import_edges_df(edf)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2253,8 +2726,14 @@ A \code{data.frame} with one row per node.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-df <- client$export_nodes_df(c(1L, 2L, 3L))
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  df <- client$export_nodes_df(c(a, b))
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2288,8 +2767,14 @@ A \code{data.frame} with \code{node_id}, \code{depth},
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-bfs_df <- client$export_bfs_df(1L, max_depth = 2L)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  bfs_df <- client$export_bfs_df(a, max_depth = b)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2325,9 +2810,14 @@ an empty \code{data.frame} if \code{results} is empty.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-results <- client$vector_search(c(0.9, 0.1, 0.3), k = 5L)
-df <- client$results_to_dataframe(results)
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  dim <- client$ping()$vector_dim
+  results <- client$vector_search(rep(0.1, dim), k = 5L)
+  df <- client$results_to_dataframe(results)
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -2361,9 +2851,15 @@ A \code{data.frame} with columns \code{id}, \code{labels}
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-df <- client$nodes_to_dataframe(c(1L, 2L, 3L))
-df$labels[[1]]
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  a <- client$create_node(c("Person"), list(name = "Alice"))
+  b <- client$create_node(c("Person"), list(name = "Bob"))
+  df <- client$nodes_to_dataframe(c(a, b))
+  df$labels[[1]]
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}

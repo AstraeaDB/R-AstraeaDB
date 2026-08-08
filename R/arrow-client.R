@@ -30,29 +30,32 @@
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' # Requires the arrow package: install.packages("arrow")
-#' client <- ArrowClient$new("grpc://localhost:7689")
-#' client$connect()
+#' \donttest{
+#' if (requireNamespace("arrow", quietly = TRUE) &&
+#'     astraea_server_available(port = 7689L)) {
+#'   # Requires the arrow package: install.packages("arrow")
+#'   client <- ArrowClient$new("grpc://localhost:7689")
+#'   client$connect()
 #'
-#' # Execute a GQL query and get an Arrow Table
-#' table <- client$query("MATCH (n:Person) RETURN n.name, n.age")
+#'   # Execute a GQL query and get an Arrow Table
+#'   table <- client$query("MATCH (n:Person) RETURN n.name, n.age")
 #'
-#' # Or get a data.frame directly
-#' df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+#'   # Or get a data.frame directly
+#'   df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
 #'
-#' # Process large results in batches
-#' client$query_batches(
-#'   "MATCH (n) RETURN n",
-#'   callback = function(batch) {
-#'     cat("Received batch with", nrow(batch), "rows\n")
-#'   }
-#' )
+#'   # Process large results in batches
+#'   client$query_batches(
+#'     "MATCH (n) RETURN n",
+#'     callback = function(batch) {
+#'       cat("Received batch with", nrow(batch), "rows\n")
+#'     }
+#'   )
 #'
-#' # List available flights
-#' flights <- client$list_flights()
+#'   # List available flights
+#'   flights <- client$list_flights()
 #'
-#' client$disconnect()
+#'   client$disconnect()
+#' }
 #' }
 #'
 #' @importFrom R6 R6Class
@@ -137,11 +140,14 @@ ArrowClient <- R6::R6Class(
     #' @return An Arrow Table containing the query results.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- ArrowClient$new()
-    #' client$connect()
-    #' table <- client$query("MATCH (n:Person) RETURN n.name")
-    #' client$disconnect()
+    #' \donttest{
+    #' if (requireNamespace("arrow", quietly = TRUE) &&
+    #'     astraea_server_available(port = 7689L)) {
+    #'   client <- ArrowClient$new()
+    #'   client$connect()
+    #'   table <- client$query("MATCH (n:Person) RETURN n.name")
+    #'   client$disconnect()
+    #' }
     #' }
     query = function(gql) {
       if (!self$is_connected()) {
@@ -164,11 +170,14 @@ ArrowClient <- R6::R6Class(
     #' @return A data.frame containing the query results.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- ArrowClient$new()
-    #' client$connect()
-    #' df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
-    #' client$disconnect()
+    #' \donttest{
+    #' if (requireNamespace("arrow", quietly = TRUE) &&
+    #'     astraea_server_available(port = 7689L)) {
+    #'   client <- ArrowClient$new()
+    #'   client$connect()
+    #'   df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+    #'   client$disconnect()
+    #' }
     #' }
     query_df = function(gql) {
       tbl <- self$query(gql)
@@ -190,16 +199,19 @@ ArrowClient <- R6::R6Class(
     #' @return Invisibly returns \code{NULL}.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- ArrowClient$new()
-    #' client$connect()
-    #' client$query_batches(
-    #'   "MATCH (n) RETURN n",
-    #'   callback = function(batch) {
-    #'     cat("Batch with", nrow(batch), "rows\n")
-    #'   }
-    #' )
-    #' client$disconnect()
+    #' \donttest{
+    #' if (requireNamespace("arrow", quietly = TRUE) &&
+    #'     astraea_server_available(port = 7689L)) {
+    #'   client <- ArrowClient$new()
+    #'   client$connect()
+    #'   client$query_batches(
+    #'     "MATCH (n) RETURN n",
+    #'     callback = function(batch) {
+    #'       cat("Batch with", nrow(batch), "rows\n")
+    #'     }
+    #'   )
+    #'   client$disconnect()
+    #' }
     #' }
     query_batches = function(gql, callback) {
       if (!self$is_connected()) {
@@ -227,11 +239,14 @@ ArrowClient <- R6::R6Class(
     #' @return A list of available flights as reported by the server.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- ArrowClient$new()
-    #' client$connect()
-    #' flights <- client$list_flights()
-    #' client$disconnect()
+    #' \donttest{
+    #' if (requireNamespace("arrow", quietly = TRUE) &&
+    #'     astraea_server_available(port = 7689L)) {
+    #'   client <- ArrowClient$new()
+    #'   client$connect()
+    #'   flights <- client$list_flights()
+    #'   client$disconnect()
+    #' }
     #' }
     list_flights = function() {
       if (!self$is_connected()) {

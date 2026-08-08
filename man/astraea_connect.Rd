@@ -22,9 +22,11 @@ step. This is a convenience wrapper that instantiates the client, calls
 \code{connect()}, and returns the connected client object.
 }
 \examples{
-\dontrun{
-client <- astraea_connect()
-client$ping()
-client$disconnect()
+\donttest{
+if (astraea_server_available()) {
+  client <- astraea_connect()
+  client$ping()
+  client$disconnect()
+}
 }
 }

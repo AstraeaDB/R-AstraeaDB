@@ -262,15 +262,21 @@ test_that("can perform vector search", {
   withr::defer(client$disconnect())
   client$connect()
 
+  # A store pins its embedding width on first insert, so the test has to use
+  # whatever the running server is configured for rather than a fixed length.
+  dim <- client$ping()$vector_dim
+  skip_if(is.null(dim), "server did not report vector_dim")
+  vec <- rep(0.1, dim)
+
   tag <- paste0("test_", format(Sys.time(), "%Y%m%d%H%M%OS6"))
   node_id <- client$create_node(
     labels = c("TestVector"),
     properties = list(name = tag),
-    embedding = c(0.1, 0.9, 0.5)
+    embedding = vec
   )
   withr::defer(tryCatch(client$delete_node(node_id), error = function(e) NULL))
 
-  results <- client$vector_search(c(0.1, 0.9, 0.5), k = 5L)
+  results <- client$vector_search(vec, k = 5L)
   expect_type(results, "list")
 })
 

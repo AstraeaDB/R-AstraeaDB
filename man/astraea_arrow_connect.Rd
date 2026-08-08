@@ -22,9 +22,12 @@ server. This is a convenience wrapper that instantiates the client, calls
 The \pkg{arrow} package must be installed to use this function.
 }
 \examples{
-\dontrun{
-client <- astraea_arrow_connect()
-result <- client$query_df("MATCH (n) RETURN n")
-client$disconnect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- astraea_arrow_connect()
+  result <- client$query_df("MATCH (n) RETURN n")
+  client$disconnect()
+}
 }
 }

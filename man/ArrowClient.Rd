@@ -31,29 +31,32 @@ For most users, the \code{\link{UnifiedClient}} is recommended as it
 automatically selects the best transport available.
 }
 \examples{
-\dontrun{
-# Requires the arrow package: install.packages("arrow")
-client <- ArrowClient$new("grpc://localhost:7689")
-client$connect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  # Requires the arrow package: install.packages("arrow")
+  client <- ArrowClient$new("grpc://localhost:7689")
+  client$connect()
 
-# Execute a GQL query and get an Arrow Table
-table <- client$query("MATCH (n:Person) RETURN n.name, n.age")
+  # Execute a GQL query and get an Arrow Table
+  table <- client$query("MATCH (n:Person) RETURN n.name, n.age")
 
-# Or get a data.frame directly
-df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+  # Or get a data.frame directly
+  df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
 
-# Process large results in batches
-client$query_batches(
-  "MATCH (n) RETURN n",
-  callback = function(batch) {
-    cat("Received batch with", nrow(batch), "rows\n")
-  }
-)
+  # Process large results in batches
+  client$query_batches(
+    "MATCH (n) RETURN n",
+    callback = function(batch) {
+      cat("Received batch with", nrow(batch), "rows\n")
+    }
+  )
 
-# List available flights
-flights <- client$list_flights()
+  # List available flights
+  flights <- client$list_flights()
 
-client$disconnect()
+  client$disconnect()
+}
 }
 
 
@@ -61,49 +64,61 @@ client$disconnect()
 ## Method `ArrowClient$query`
 ## ------------------------------------------------
 
-\dontrun{
-client <- ArrowClient$new()
-client$connect()
-table <- client$query("MATCH (n:Person) RETURN n.name")
-client$disconnect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  table <- client$query("MATCH (n:Person) RETURN n.name")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `ArrowClient$query_df`
 ## ------------------------------------------------
 
-\dontrun{
-client <- ArrowClient$new()
-client$connect()
-df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
-client$disconnect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `ArrowClient$query_batches`
 ## ------------------------------------------------
 
-\dontrun{
-client <- ArrowClient$new()
-client$connect()
-client$query_batches(
-  "MATCH (n) RETURN n",
-  callback = function(batch) {
-    cat("Batch with", nrow(batch), "rows\n")
-  }
-)
-client$disconnect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  client$query_batches(
+    "MATCH (n) RETURN n",
+    callback = function(batch) {
+      cat("Batch with", nrow(batch), "rows\n")
+    }
+  )
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `ArrowClient$list_flights`
 ## ------------------------------------------------
 
-\dontrun{
-client <- ArrowClient$new()
-client$connect()
-flights <- client$list_flights()
-client$disconnect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  flights <- client$list_flights()
+  client$disconnect()
+}
 }
 }
 \section{Public fields}{
@@ -223,11 +238,14 @@ An Arrow Table containing the query results.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- ArrowClient$new()
-client$connect()
-table <- client$query("MATCH (n:Person) RETURN n.name")
-client$disconnect()
+\preformatted{\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  table <- client$query("MATCH (n:Person) RETURN n.name")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -259,11 +277,14 @@ A data.frame containing the query results.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- ArrowClient$new()
-client$connect()
-df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
-client$disconnect()
+\preformatted{\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -300,16 +321,19 @@ Invisibly returns \code{NULL}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- ArrowClient$new()
-client$connect()
-client$query_batches(
-  "MATCH (n) RETURN n",
-  callback = function(batch) {
-    cat("Batch with", nrow(batch), "rows\n")
-  }
-)
-client$disconnect()
+\preformatted{\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  client$query_batches(
+    "MATCH (n) RETURN n",
+    callback = function(batch) {
+      cat("Batch with", nrow(batch), "rows\n")
+    }
+  )
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -333,11 +357,14 @@ A list of available flights as reported by the server.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- ArrowClient$new()
-client$connect()
-flights <- client$list_flights()
-client$disconnect()
+\preformatted{\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  client <- ArrowClient$new()
+  client$connect()
+  flights <- client$list_flights()
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}

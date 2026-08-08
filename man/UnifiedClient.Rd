@@ -27,34 +27,37 @@ and query methods (\code{$query()}, \code{$query_df()}).
 }
 }
 \examples{
-\dontrun{
-# Basic usage
-client <- UnifiedClient$new()
-client$connect()
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE) &&
+    astraea_server_available(port = 7689L)) {
+  # Basic usage
+  client <- UnifiedClient$new()
+  client$connect()
 
-# CRUD operations use JSON/TCP
-node_id <- client$create_node(list("Person"), list(name = "Alice", age = 30))
-node <- client$get_node(node_id)
+  # CRUD operations use JSON/TCP
+  node_id <- client$create_node(list("Person"), list(name = "Alice", age = 30))
+  node <- client$get_node(node_id)
 
-# Queries use Arrow Flight if available, otherwise JSON/TCP
-df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+  # Queries use Arrow Flight if available, otherwise JSON/TCP
+  df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
 
-# Check transport status
-client$is_arrow_enabled()
+  # Check transport status
+  client$is_arrow_enabled()
 
-client$disconnect()
+  client$disconnect()
 
-# With authentication
-client <- UnifiedClient$new(auth_token = "my-secret-token")
-client$connect()
+  # With authentication
+  client <- UnifiedClient$new(auth_token = "my-secret-token")
+  client$connect()
 
-# Custom Flight URI
-client <- UnifiedClient$new(
-  host = "db.example.com",
-  port = 7687L,
-  flight_uri = "grpc://db.example.com:7689"
-)
-client$connect()
+  # Custom Flight URI
+  client <- UnifiedClient$new(
+    host = "db.example.com",
+    port = 7687L,
+    flight_uri = "grpc://db.example.com:7689"
+  )
+  client$connect()
+}
 }
 
 
@@ -62,22 +65,26 @@ client$connect()
 ## Method `UnifiedClient$query`
 ## ------------------------------------------------
 
-\dontrun{
-client <- UnifiedClient$new()
-client$connect()
-result <- client$query("MATCH (n:Person) RETURN n.name")
-client$disconnect()
+\donttest{
+if (astraea_server_available()) {
+  client <- UnifiedClient$new()
+  client$connect()
+  result <- client$query("MATCH (n:Person) RETURN n.name")
+  client$disconnect()
+}
 }
 
 ## ------------------------------------------------
 ## Method `UnifiedClient$query_df`
 ## ------------------------------------------------
 
-\dontrun{
-client <- UnifiedClient$new()
-client$connect()
-df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
-client$disconnect()
+\donttest{
+if (astraea_server_available()) {
+  client <- UnifiedClient$new()
+  client$connect()
+  df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+  client$disconnect()
+}
 }
 }
 \section{Public fields}{
@@ -1304,11 +1311,13 @@ list when using JSON/TCP.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- UnifiedClient$new()
-client$connect()
-result <- client$query("MATCH (n:Person) RETURN n.name")
-client$disconnect()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- UnifiedClient$new()
+  client$connect()
+  result <- client$query("MATCH (n:Person) RETURN n.name")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}
@@ -1340,11 +1349,13 @@ A data.frame containing the query results.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
-client <- UnifiedClient$new()
-client$connect()
-df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
-client$disconnect()
+\preformatted{\donttest{
+if (astraea_server_available()) {
+  client <- UnifiedClient$new()
+  client$connect()
+  df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+  client$disconnect()
+}
 }
 }
 \if{html}{\out{</div>}}

@@ -13,10 +13,12 @@
 #' @return A connected \code{\link{AstraeaClient}} object.
 #' @export
 #' @examples
-#' \dontrun{
-#' client <- astraea_connect()
-#' client$ping()
-#' client$disconnect()
+#' \donttest{
+#' if (astraea_server_available()) {
+#'   client <- astraea_connect()
+#'   client$ping()
+#'   client$disconnect()
+#' }
 #' }
 astraea_connect <- function(host = "127.0.0.1", port = 7687L,
                             auth_token = NULL) {
@@ -39,10 +41,13 @@ astraea_connect <- function(host = "127.0.0.1", port = 7687L,
 #' @return A connected \code{\link{ArrowClient}} object.
 #' @export
 #' @examples
-#' \dontrun{
-#' client <- astraea_arrow_connect()
-#' result <- client$query_df("MATCH (n) RETURN n")
-#' client$disconnect()
+#' \donttest{
+#' if (requireNamespace("arrow", quietly = TRUE) &&
+#'     astraea_server_available(port = 7689L)) {
+#'   client <- astraea_arrow_connect()
+#'   result <- client$query_df("MATCH (n) RETURN n")
+#'   client$disconnect()
+#' }
 #' }
 astraea_arrow_connect <- function(uri = "grpc://localhost:7689") {
   client <- ArrowClient$new(uri = uri)
@@ -62,10 +67,8 @@ astraea_arrow_connect <- function(uri = "grpc://localhost:7689") {
 #' @return Logical. \code{TRUE} if server is reachable, \code{FALSE} otherwise.
 #' @export
 #' @examples
-#' \dontrun{
 #' if (astraea_server_available()) {
 #'   client <- astraea_connect()
-#' }
 #' }
 astraea_server_available <- function(host = "127.0.0.1", port = 7687L,
                                      timeout = 2) {

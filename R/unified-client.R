@@ -26,34 +26,37 @@
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' # Basic usage
-#' client <- UnifiedClient$new()
-#' client$connect()
+#' \donttest{
+#' if (requireNamespace("arrow", quietly = TRUE) &&
+#'     astraea_server_available(port = 7689L)) {
+#'   # Basic usage
+#'   client <- UnifiedClient$new()
+#'   client$connect()
 #'
-#' # CRUD operations use JSON/TCP
-#' node_id <- client$create_node(list("Person"), list(name = "Alice", age = 30))
-#' node <- client$get_node(node_id)
+#'   # CRUD operations use JSON/TCP
+#'   node_id <- client$create_node(list("Person"), list(name = "Alice", age = 30))
+#'   node <- client$get_node(node_id)
 #'
-#' # Queries use Arrow Flight if available, otherwise JSON/TCP
-#' df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+#'   # Queries use Arrow Flight if available, otherwise JSON/TCP
+#'   df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
 #'
-#' # Check transport status
-#' client$is_arrow_enabled()
+#'   # Check transport status
+#'   client$is_arrow_enabled()
 #'
-#' client$disconnect()
+#'   client$disconnect()
 #'
-#' # With authentication
-#' client <- UnifiedClient$new(auth_token = "my-secret-token")
-#' client$connect()
+#'   # With authentication
+#'   client <- UnifiedClient$new(auth_token = "my-secret-token")
+#'   client$connect()
 #'
-#' # Custom Flight URI
-#' client <- UnifiedClient$new(
-#'   host = "db.example.com",
-#'   port = 7687L,
-#'   flight_uri = "grpc://db.example.com:7689"
-#' )
-#' client$connect()
+#'   # Custom Flight URI
+#'   client <- UnifiedClient$new(
+#'     host = "db.example.com",
+#'     port = 7687L,
+#'     flight_uri = "grpc://db.example.com:7689"
+#'   )
+#'   client$connect()
+#' }
 #' }
 #'
 #' @importFrom R6 R6Class
@@ -744,11 +747,13 @@ UnifiedClient <- R6::R6Class(
     #'   list when using JSON/TCP.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- UnifiedClient$new()
-    #' client$connect()
-    #' result <- client$query("MATCH (n:Person) RETURN n.name")
-    #' client$disconnect()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- UnifiedClient$new()
+    #'   client$connect()
+    #'   result <- client$query("MATCH (n:Person) RETURN n.name")
+    #'   client$disconnect()
+    #' }
     #' }
     query = function(gql) {
       if (self$use_arrow && !is.null(self$arrow_client)) {
@@ -769,22 +774,40 @@ UnifiedClient <- R6::R6Class(
     #' @return A data.frame containing the query results.
     #'
     #' @examples
-    #' \dontrun{
-    #' client <- UnifiedClient$new()
-    #' client$connect()
-    #' df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
-    #' client$disconnect()
+    #' \donttest{
+    #' if (astraea_server_available()) {
+    #'   client <- UnifiedClient$new()
+    #'   client$connect()
+    #'   df <- client$query_df("MATCH (n:Person) RETURN n.name, n.age")
+    #'   client$disconnect()
+    #' }
     #' }
     query_df = function(gql) {
       if (self$use_arrow && !is.null(self$arrow_client)) {
         self$arrow_client$query_df(gql)
       } else {
         result <- self$json_client$query(gql)
-        if (!is.null(result$rows)) {
-          do.call(rbind, lapply(result$rows, as.data.frame))
-        } else {
-          data.frame()
+        if (is.null(result$rows) || length(result$rows) == 0L) {
+          return(data.frame())
         }
+        rows <- lapply(result$rows, function(r) {
+          # A property that a node does not carry comes back as NULL. Passing
+          # that straight to as.data.frame() produces a zero-length column and
+          # fails with "arguments imply differing number of rows", so an
+          # absent property becomes NA instead.
+          nulls <- vapply(r, is.null, logical(1))
+          if (any(nulls)) r[nulls] <- NA
+          as.data.frame(r, stringsAsFactors = FALSE)
+        })
+        # Rows need not agree on which columns they carry, because a query can
+        # match nodes with different property sets. Take the union and fill the
+        # gaps, rather than letting rbind fail on mismatched names.
+        cols <- unique(unlist(lapply(rows, names)))
+        rows <- lapply(rows, function(d) {
+          for (missing in setdiff(cols, names(d))) d[[missing]] <- NA
+          d[cols]
+        })
+        do.call(rbind, rows)
       }
     },
 

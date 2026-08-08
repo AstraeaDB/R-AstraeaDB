@@ -51,8 +51,9 @@ Three further changes came out of actually running the examples, which
   property to `NA` and takes the union of columns across rows. One integration
   test was widened to cover this.
 
-No version bump: the package has not been on CRAN, so this supersedes the
-previous submission of 0.2.0.
+The version is bumped to 0.2.1 for this resubmission, so that the submitted
+tarball is distinguishable from the 0.2.0 that was reviewed. NEWS.md records
+the changes above under a 0.2.1 heading.
 
 ## R CMD check results
 

@@ -1,7 +1,7 @@
 Package: AstraeaDB
 Type: Package
 Title: Client for the 'AstraeaDB' Graph Database
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: person("James", "Harris", role = c("aut", "cre"),
     email = "jimeharrisjr@gmail.com")
 Description: Provides a client for 'AstraeaDB', a graph database with

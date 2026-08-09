@@ -68,12 +68,35 @@ tests pass under both conditions.
   Maintainer: 'James Harris <jimeharrisjr@gmail.com>'
   New submission
 
-  The standard note for a first submission. Earlier submissions also flagged
-  "betweenness" and "lookups" as possibly misspelled. Both are correct:
-  "betweenness" is the standard graph-theory term (betweenness centrality) and
-  "lookups" is the plural of "lookup".
+  The standard note for a first submission. Five words in the Description are
+  flagged as possibly misspelled. All five are correct:
 
-Two further notes are specific to the local check host and do not reflect
+  * "GQL" is Graph Query Language, the ISO/IEC 39075:2024 standard.
+  * "Louvain" is the community-detection algorithm, named for the university.
+  * "PageRank" is the ranking algorithm.
+  * "betweenness" is the standard graph-theory term (betweenness centrality).
+  * "lookups" is the plural of "lookup".
+
+  Three of these ("GQL", "Louvain", "PageRank") are newly flagged in this
+  submission, and only because of the requested change above: they previously
+  sat inside single quotes, which the spell checker skips, and removing the
+  quotes exposed them. They were already spelled this way.
+
+### win-builder
+
+Both win-builder runs of this tarball returned **1 NOTE** and nothing else, the
+note being the incoming-feasibility one above:
+
+* R 4.6.1 (2026-06-24 ucrt): 1 NOTE, `checking examples ... OK`,
+  `checking tests ... [42s] OK`.
+* R-devel (2026-08-07 r90377 ucrt): 1 NOTE, same results.
+
+This is the first check in which the examples actually ran on Windows, since
+they were `\dontrun{}` previously. With no AstraeaDB server present the
+`astraea_server_available()` guard returns FALSE and each `\donttest{}` example
+is a no-op, which is the behaviour intended.
+
+The two notes below appear only on the local macOS check host and do not reflect
 package problems:
 
 * "checking for future file timestamps ... NOTE: unable to verify current

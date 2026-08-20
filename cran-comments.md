@@ -88,8 +88,12 @@ Both win-builder runs of this tarball returned **1 NOTE** and nothing else, the
 note being the incoming-feasibility one above:
 
 * R 4.6.1 (2026-06-24 ucrt): 1 NOTE, `checking examples ... OK`,
-  `checking tests ... [42s] OK`.
-* R-devel (2026-08-07 r90377 ucrt): 1 NOTE, same results.
+  `checking tests ... [45s] OK`.
+* R-devel (2026-08-17 r90424 ucrt): 1 NOTE, `checking examples ... OK`,
+  `checking tests ... [46s] OK`.
+
+Both runs were repeated on 2026-08-19 against the current R-devel snapshot and
+returned the same single note, with no warnings and no errors.
 
 This is the first check in which the examples actually ran on Windows, since
 they were `\dontrun{}` previously. With no AstraeaDB server present the
@@ -119,4 +123,12 @@ can reach a server during a CRAN check. Each layer is guarded accordingly:
 
 ## Test environments
 
-* local: macOS, R 4.4.1 (with and without a live AstraeaDB server)
+* local: macOS 15, R 4.4.1, checked both without a server (each `\donttest{}`
+  example a no-op, integration tests skipped) and against a live AstraeaDB
+  server, where the full suite runs: 111 tests pass, 0 fail, 1 skipped (the
+  optional Arrow Flight suite, as 'arrow' is not installed on that host).
+* win-builder: R 4.6.1 (2026-06-24 ucrt) — 1 NOTE.
+* win-builder: R-devel (2026-08-17 r90424 ucrt) — 1 NOTE.
+
+The single note is the incoming-feasibility one discussed above and is
+identical on both Windows environments.

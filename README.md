@@ -1,6 +1,8 @@
 # AstraeaDB
 
 <!-- badges: start -->
+[![CRAN status](https://www.r-pkg.org/badges/version/AstraeaDB)](https://CRAN.R-project.org/package=AstraeaDB)
+[![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/AstraeaDB)](https://CRAN.R-project.org/package=AstraeaDB)
 <!-- badges: end -->
 
 An R client for [AstraeaDB](https://github.com/AstraeaDB/AstraeaDB-Official), a
@@ -13,7 +15,11 @@ with LLM integration).
 
 ## Installation
 
-Install the development version from GitHub:
+```r
+install.packages("AstraeaDB")
+```
+
+Or the development version, which may be ahead of the CRAN release:
 
 ```r
 # install.packages("remotes")
